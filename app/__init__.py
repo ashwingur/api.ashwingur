@@ -1,7 +1,7 @@
 from flask import Flask
 
 from config import Config
-from app.extensions import db, limiter
+from app.extensions import db, limiter, cors
 
 
 def create_app(config_class=Config):
@@ -14,6 +14,8 @@ def create_app(config_class=Config):
     with app.app_context():
         from app.models.post import Post
         db.create_all()
+    # Initialise CORS for auth
+    cors.init_app(app, supports_credentials=True)
     # Initialise rate limiter
     limiter.init_app(app)
 

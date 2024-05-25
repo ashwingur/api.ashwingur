@@ -3,3 +3,5 @@ psycopg2-binary
 Flask-SQLAlchemy
 gunicorn
 Flask-Limiter
+Flask-Cors
+Flask-HTTPAuth
