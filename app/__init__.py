@@ -1,7 +1,8 @@
 from flask import Flask
 
 from config import Config
-from app.extensions import db
+from app.extensions import db, limiter
+
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -13,6 +14,8 @@ def create_app(config_class=Config):
     with app.app_context():
         from app.models.post import Post
         db.create_all()
+    # Initialise rate limiter
+    limiter.init_app(app)
 
     # Register blueprints
     from app.main import bp as main_bp
@@ -22,6 +25,7 @@ def create_app(config_class=Config):
     app.register_blueprint(posts_bp, url_prefix='/posts')
 
     @app.route('/test/')
+    @limiter.limit("1/second", override_defaults=False)
     def test_page():
         return '<h1>Hello, world!!!</h1>'
     
