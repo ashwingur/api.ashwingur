@@ -42,7 +42,7 @@ def login():
         if data['username'] == username and data['password'] == password:
             user = User(user_id, username)
             login_user(user)
-            return jsonify({'message': 'Login successful'}), 200
+            return jsonify({'message': 'Login successful','username': current_user.username}), 200
 
     return jsonify({'message': 'Invalid credentials'}), 401
 
