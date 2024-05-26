@@ -4,4 +4,4 @@ Flask-SQLAlchemy
 gunicorn
 Flask-Limiter
 Flask-Cors
-Flask-HTTPAuth
+flask-login

@@ -1,12 +1,13 @@
 from flask import Flask
 
 from config import Config
-from app.extensions import db, limiter, cors
+from app.extensions import db, limiter, cors, login_manager
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    app.secret_key = "some_secret_key"
 
     # Initialise flask extensions
     # Initialise sqlalchemy db
@@ -18,6 +19,8 @@ def create_app(config_class=Config):
     cors.init_app(app, supports_credentials=True)
     # Initialise rate limiter
     limiter.init_app(app)
+    # Initialise login manager
+    login_manager.init_app(app)
 
     # Register blueprints
     from app.main import bp as main_bp
