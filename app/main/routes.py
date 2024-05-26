@@ -1,6 +1,6 @@
 from flask import render_template, request, jsonify, make_response
 from app.main import bp
-from app.extensions import auth
+from app.extensions import auth, limiter
 
 @bp.route('/')
 def index():
@@ -18,10 +18,13 @@ def verify_password(username, password):
     return None
 
 @bp.route('/login', methods=['POST'])
+@limiter.limit("10/minute", override_defaults=False)
 @auth.login_required
 def login():
     response = make_response(jsonify({"message": "Login successful"}))
-    response.set_cookie('username', auth.username(), httponly=True)
+    expires_in_days = 7
+    max_age = expires_in_days * 24 * 60 * 60
+    response.set_cookie('username', auth.username(), httponly=True, max_age=max_age)
     return response
 
 @bp.route('/logout', methods=['POST'])
