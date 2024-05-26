@@ -14,6 +14,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     with app.app_context():
         from app.models.post import Post
+        from app.models.user import User
         db.create_all()
     # Initialise CORS for auth
     cors.init_app(app, supports_credentials=True)
