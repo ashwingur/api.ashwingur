@@ -20,6 +20,7 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 @bp.route('/users', methods=['GET', 'POST', 'DELETE'])
+@limiter.limit("10/minute", override_defaults=False)
 @login_required
 @roles_required('admin')
 def users():
