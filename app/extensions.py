@@ -3,8 +3,10 @@ from flask import abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import psycopg2
 from flask_cors import CORS
 from flask_login import LoginManager, current_user
+from config import Config
 
 db = SQLAlchemy()
 
@@ -17,6 +19,9 @@ limiter = Limiter(
     default_limits=["50 per hour"]
 )
 
+def psycop_conn():
+    return psycopg2.connect(Config.SQLALCHEMY_DATABASE_URI)
+
 # Role required decorator
 def roles_required(*roles):
     def wrapper(f):
@@ -28,3 +33,4 @@ def roles_required(*roles):
             return f(*args, **kwargs)
         return decorated_function
     return wrapper
+

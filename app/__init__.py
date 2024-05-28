@@ -1,6 +1,5 @@
 from flask import Flask
 import os
-
 from config import Config
 from app.extensions import db, limiter, cors, login_manager
 
@@ -20,6 +19,10 @@ def create_app(config_class=Config):
         # User.__table__.drop(db.engine)
         db.create_all()
         # Create admin user here if needed
+    # Initialise sensor data table if it doesn't exist (this uses timescale db)
+    from app.models.weather_data import setup_sensor_data_table
+    setup_sensor_data_table()
+
     # Initialise CORS for auth
     cors.init_app(app, supports_credentials=True)
     # Initialise rate limiter
