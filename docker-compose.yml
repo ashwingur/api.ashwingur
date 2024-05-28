@@ -7,18 +7,20 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - DB_URL=postgresql://q9JH2exxJSZT135JFo6i:F20lJ92mSDGqMy0URufq@flask_db:5432/postgres
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@flask_db:5432/${POSTGRES_DB}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
     depends_on:
       - flask_db
+
   flask_db:
     container_name: flask_db
     image: postgres:13
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=F20lJ92mSDGqMy0URufq
-      - POSTGRES_USER=q9JH2exxJSZT135JFo6i
-      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
 
