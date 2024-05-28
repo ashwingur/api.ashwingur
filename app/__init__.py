@@ -15,10 +15,11 @@ def create_app(config_class=Config):
     db.init_app(app)
     with app.app_context():
         from app.models.post import Post
-        from app.models.user import User
+        from app.models.user import User, create_admin_user
         # REMOVE THIS AFTER BECAUSE IT CAN WIPE THE WHOLE DB
         # User.__table__.drop(db.engine)
         db.create_all()
+        # Create admin user here if needed
     # Initialise CORS for auth
     cors.init_app(app, supports_credentials=True)
     # Initialise rate limiter

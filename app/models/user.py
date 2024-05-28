@@ -1,6 +1,8 @@
 from datetime import datetime
 from app.extensions import db
 from flask_login import UserMixin
+from werkzeug.security import generate_password_hash
+
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -12,3 +14,9 @@ class User(UserMixin, db.Model):
 
     def has_role(self, *roles):
         return self.role in roles
+    
+
+def create_admin_user(username, password):
+    new_user = User(username=username, password=generate_password_hash(password), role='admin')
+    db.session.add(new_user)
+    db.session.commit()
