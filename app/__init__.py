@@ -36,5 +36,8 @@ def create_app(config_class=Config):
     
     from app.posts import bp as posts_bp
     app.register_blueprint(posts_bp, url_prefix='/posts')
+
+    from app.weather import bp as weather_bp
+    app.register_blueprint(weather_bp, url_prefix='/weather')
     
     return app

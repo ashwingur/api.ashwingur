@@ -1,10 +1,8 @@
 from datetime import datetime
-from flask import render_template, request, jsonify, make_response, abort
+from flask import render_template, request, jsonify
 from app.main import bp
 from app.extensions import limiter, login_manager, db
-from flask_login import UserMixin, login_user, logout_user, login_required, current_user
-from functools import wraps
-import sys
+from flask_login import login_user, logout_user, login_required, current_user
 from app.models.user import User
 from app.extensions import roles_required
 from werkzeug.security import generate_password_hash, check_password_hash

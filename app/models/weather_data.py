@@ -47,3 +47,29 @@ def insert_sensor_data(timestamp, pressure, humidity, ambient_light, air_quality
         with conn.cursor() as cur:
             cur.execute(insert_query, (timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2))
     conn.close()
+
+def get_all_sensor_data():
+    """
+    Fetch all sensor data from the database, sorted by timestamp.
+    """
+    conn = psycop_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2
+            FROM sensor_data
+            ORDER BY timestamp
+        """)
+        rows = cur.fetchall()
+    conn.close()
+
+    sensor_data_list = [{
+        'timestamp': row[0],
+        'pressure': row[1],
+        'humidity': row[2],
+        'ambient_light': row[3],
+        'air_quality_index': row[4],
+        'TVOC': row[5],
+        'eCO2': row[6]
+    } for row in rows]
+
+    return rows
