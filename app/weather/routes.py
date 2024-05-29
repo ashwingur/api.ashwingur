@@ -12,7 +12,9 @@ from app.extensions import roles_required
 @roles_required('user', 'admin')
 def users():
     if request.method == 'GET':
-        return jsonify(get_all_sensor_data()), 200
+        data = get_all_sensor_data()
+        headers = ['timestamp', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
+        return jsonify({'headers': headers, 'data': data} ), 200
     elif request.method == 'POST':
         data = request.json
 

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+import random
 from app.extensions import psycop_conn
 from psycopg2 import sql
 
@@ -62,14 +64,36 @@ def get_all_sensor_data():
         rows = cur.fetchall()
     conn.close()
 
-    sensor_data_list = [{
-        'timestamp': row[0],
-        'pressure': row[1],
-        'humidity': row[2],
-        'ambient_light': row[3],
-        'air_quality_index': row[4],
-        'TVOC': row[5],
-        'eCO2': row[6]
-    } for row in rows]
+    sensor_data_list = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in rows]
 
-    return rows
+    return sensor_data_list
+
+def test_insert_sensor_data(n, time_gap_seconds=300):
+    """
+    Insert 'n' rows into the sensor_data table with timestamps incremented by 'time_gap' seconds.
+    """
+    # Current timestamp
+    current_timestamp = datetime.now()
+    
+    for i in range(n):
+        # Generate reasonable random values for other columns
+        pressure = random.uniform(950, 1050)  # Assuming pressure in hPa
+        humidity = random.uniform(30, 90)     # Assuming humidity in %
+        ambient_light = random.uniform(0, 1000) # Assuming ambient light in lux
+        air_quality_index = random.randint(1, 5) # Assuming AQI index
+        TVOC = random.uniform(0, 600)         # Total Volatile Organic Compounds in ppb
+        eCO2 = random.uniform(400, 5000)      # Equivalent CO2 in ppm
+        
+        # Call the insert function
+        insert_sensor_data(
+            current_timestamp,
+            pressure,
+            humidity,
+            ambient_light,
+            air_quality_index,
+            TVOC,
+            eCO2
+        )
+        
+        # Increment the timestamp by 'time_gap' seconds
+        current_timestamp += timedelta(seconds=time_gap_seconds)
