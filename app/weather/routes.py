@@ -5,25 +5,27 @@ from datetime import datetime, timedelta
 from app.weather import bp
 from app.extensions import limiter, login_manager, db
 from flask_login import login_required, current_user
-from app.models.weather_data import insert_sensor_data, get_all_sensor_data, execute_sensor_query, get_sensor_data_between_timestamps
+from app.models.weather_data import insert_sensor_data, get_sensor_data_between_timestamps, get_latest_single_sensor_data
 from app.extensions import roles_required
+from zoneinfo import ZoneInfo
 
 @bp.route('/', methods=['GET', 'POST'])
 @limiter.limit("15/minute", override_defaults=True)
 @roles_required('user', 'admin')
-def users():
+def sensor_data():
     if request.method == 'GET':
-        # We expect a start and end timestamp, if none is given assume last 24 hours
+        # We expect a start and end timestamp, if none is given assume the latest data point
         # Expecting unix timestamp
         data = request.json
         if 'start' not in data and 'end' not in data:
-            start = datetime.now()
-            end = datetime.now() - timedelta(days=1)
+            sensor_data = [get_latest_single_sensor_data()]
+        elif 'start' in data and 'end' in data:
+            start = datetime.fromtimestamp(data.get('start'), tz=ZoneInfo("UTC")) 
+            end = datetime.fromtimestamp(data.get('end'), tz=ZoneInfo("UTC")) 
+            sensor_data = get_sensor_data_between_timestamps(start, end)
         else:
-            start = datetime.utcfromtimestamp(data.get('start')) 
-            end = datetime.utcfromtimestamp(data.get('end')) 
+            return jsonify({"success": False, 'error': "'start' and 'end' must both be provided, or not at all"}), 400
 
-        sensor_data = get_sensor_data_between_timestamps(start, end)
         headers = ['timestamp', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
         return jsonify({'headers': headers, 'data': sensor_data} ), 200
     elif request.method == 'POST':
@@ -38,9 +40,9 @@ def users():
 
         # Parse the incoming JSON data
         if 'timestamp' in data:
-            timestamp = datetime.strptime(data['timestamp'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            timestamp = datetime.strptime(data['timestamp'], '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=ZoneInfo("UTC"))
         else:
-            timestamp = datetime.now()
+            timestamp = datetime.now(ZoneInfo("UTC"))
         try:
             pressure = data['pressure']
             humidity = data['humidity']

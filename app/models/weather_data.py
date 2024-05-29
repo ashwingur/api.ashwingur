@@ -50,6 +50,28 @@ def insert_sensor_data(timestamp, pressure, humidity, ambient_light, air_quality
             cur.execute(insert_query, (timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2))
     conn.close()
 
+def get_latest_single_sensor_data():
+    """
+    Fetch the latest sensor data from the database based on the timestamp.
+    """
+    conn = psycop_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2
+            FROM sensor_data
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+    conn.close()
+
+    if row:
+        latest_data = [int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]]
+        return latest_data
+    else:
+        return []
+
+
 def get_all_sensor_data():
     """
     Fetch all sensor data from the database, sorted by timestamp.
