@@ -68,6 +68,79 @@ def get_all_sensor_data():
 
     return sensor_data_list
 
+def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_time_bucket=None):
+    """
+    Retrieve sensor data aggregated over the specified time bucket between start and end timestamps.
+    
+    Parameters:
+    - start: The start timestamp (datetime object).
+    - end: The end timestamp (datetime object).
+    - custom_time_bucket: Optional. A string representing the time bucket for aggregation (e.g., '1 hour', '1 day', '30 minutes').
+    
+    Returns:
+    - results: A list of lists containing the aggregated data.
+    """
+    if custom_time_bucket is None:
+        days = (end - start).days
+        if days <= 2:
+            time_bucket = '5 minutes'
+        elif days <= 4: 
+            time_bucket = '15 minutes'
+        elif days <= 7:
+            time_bucket = '30 minutes'
+        elif days <= 14:
+            time_bucket = '1 hour'
+        elif days <= 32:
+            time_bucket = '2 hours'
+        elif days <= 90:
+            time_bucket = '6 hours'
+        else:
+            time_bucket = '1 day'
+    else:
+        time_bucket = custom_time_bucket
+
+    query = """
+    SELECT
+        time_bucket(%s, timestamp) AS bucket,
+        ROUND(CAST(AVG(pressure) AS NUMERIC), 3) AS avg_pressure,
+        ROUND(CAST(AVG(humidity) AS NUMERIC), 3) AS avg_humidity,
+        ROUND(CAST(AVG(ambient_light) AS NUMERIC), 3) AS avg_ambient_light,
+        ROUND(CAST(AVG(air_quality_index) AS NUMERIC), 3) AS avg_air_quality_index,
+        ROUND(CAST(AVG(TVOC) AS NUMERIC), 3) AS avg_TVOC,
+        ROUND(CAST(AVG(eCO2) AS NUMERIC), 3) AS avg_eCO2
+    FROM
+        sensor_data
+    WHERE
+        timestamp >= %s AND timestamp <= %s
+    GROUP BY
+        bucket
+    ORDER BY
+        bucket;
+    """
+
+    conn = psycop_conn()
+    cur = conn.cursor()
+    cur.execute(query, (time_bucket, start, end))
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in results]
+
+
+def execute_sensor_query(query):
+    # Check if the query is a read-only query
+    if not query.strip().lower().startswith("select"):
+        raise ValueError("Only SELECT queries are allowed.")
+    
+    conn = psycop_conn()
+    with conn.cursor() as cur:
+        cur.execute(query)
+        results = cur.fetchall()
+    conn.close()
+    results = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in results]
+    return results
+
 def test_insert_sensor_data(n, time_gap_seconds=300):
     """
     Insert 'n' rows into the sensor_data table with timestamps incremented by 'time_gap' seconds.

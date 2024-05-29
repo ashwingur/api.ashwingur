@@ -1,9 +1,9 @@
 from flask import request, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.weather import bp
 from app.extensions import limiter, login_manager, db
 from flask_login import login_required, current_user
-from app.models.weather_data import insert_sensor_data, get_all_sensor_data
+from app.models.weather_data import insert_sensor_data, get_all_sensor_data, execute_sensor_query, get_sensor_data_between_timestamps
 from app.extensions import roles_required
 
 @bp.route('/', methods=['GET', 'POST'])
@@ -12,9 +12,19 @@ from app.extensions import roles_required
 @roles_required('user', 'admin')
 def users():
     if request.method == 'GET':
-        data = get_all_sensor_data()
+        # We expect a start and end timestamp, if none is given assume last 24 hours
+        # Expecting unix timestamp
+        data = request.json
+        if 'start' not in data and 'end' not in data:
+            start = datetime.now()
+            end = datetime.now() - timedelta(days=1)
+        else:
+            start = datetime.utcfromtimestamp(data.get('start')) 
+            end = datetime.utcfromtimestamp(data.get('end')) 
+
+        sensor_data = get_sensor_data_between_timestamps(start, end)
         headers = ['timestamp', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
-        return jsonify({'headers': headers, 'data': data} ), 200
+        return jsonify({'headers': headers, 'data': sensor_data} ), 200
     elif request.method == 'POST':
         data = request.json
 
