@@ -141,12 +141,18 @@ def execute_sensor_query(query):
     results = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in results]
     return results
 
-def test_insert_sensor_data(n, time_gap_seconds=300):
+def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
     """
     Insert 'n' rows into the sensor_data table with timestamps incremented by 'time_gap' seconds.
+
+    Parameters:
+    - n: Number of rows to add
+    - days_from_past: Positive number representing how many days in the past to generate from
+    - time_gap_seconds: sampling interval
+
     """
     # Current timestamp
-    current_timestamp = datetime.now()
+    current_timestamp = datetime.now() - timedelta(days=days_from_past)
     
     for i in range(n):
         # Generate reasonable random values for other columns

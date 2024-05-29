@@ -1,3 +1,5 @@
+import os
+import sys
 from flask import request, jsonify
 from datetime import datetime, timedelta
 from app.weather import bp
@@ -7,8 +9,7 @@ from app.models.weather_data import insert_sensor_data, get_all_sensor_data, exe
 from app.extensions import roles_required
 
 @bp.route('/', methods=['GET', 'POST'])
-@limiter.limit("30/minute", override_defaults=True)
-@login_required
+@limiter.limit("15/minute", override_defaults=True)
 @roles_required('user', 'admin')
 def users():
     if request.method == 'GET':
@@ -27,6 +28,13 @@ def users():
         return jsonify({'headers': headers, 'data': sensor_data} ), 200
     elif request.method == 'POST':
         data = request.json
+
+        if 'password' not in data:
+            return jsonify({"success": False, 'error': 'password not provided'}), 400
+        if data['password'] != os.environ.get('WEATHER_POST_PASSWORD'):
+            print(f'password: {data["password"]}, actual: {os.environ.get("WEATHER_POST_PASSWORD")}', file=sys.stderr)
+            return jsonify({"success": False, 'error': 'incorrect password'}), 400
+
 
         # Parse the incoming JSON data
         if 'timestamp' in data:
