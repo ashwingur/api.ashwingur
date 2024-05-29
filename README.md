@@ -4,13 +4,25 @@ Using Flask and PostgreSQL (with TimescaleDB extension) in a Docker container
 
 ## Startup
 
+One step:
+
+```
+docker-compose up --build
+```
+
 1. Start the database
 
 ```
 docker compose up -d flask_db
 ```
 
-2. Start the flask app
+1. Start redis
+
+```
+docker compose up -d flask_redis
+```
+
+3. Start the flask app
 
 ```
 docker compose up --build flask_app

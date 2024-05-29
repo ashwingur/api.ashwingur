@@ -5,3 +5,4 @@ gunicorn
 Flask-Limiter
 Flask-Cors
 flask-login
+redis

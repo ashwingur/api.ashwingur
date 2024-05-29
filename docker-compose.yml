@@ -8,8 +8,10 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@flask_db:5432/${POSTGRES_DB}
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
       - WEATHER_POST_PASSWORD=${WEATHER_POST_PASSWORD}
+      - REDIS_URL=redis://flask_redis:6379/0
     depends_on:
       - flask_db
+      - flask_redis
 
   flask_db:
     container_name: flask_db
@@ -22,6 +24,12 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  flask_redis:
+    container_name: flask_redis
+    image: redis:latest
+    ports:
+      - "6379:6379"
 
 volumes:
   pgdata: {}

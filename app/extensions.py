@@ -16,7 +16,8 @@ login_manager = LoginManager()
 
 limiter = Limiter(
     get_remote_address,
-    default_limits=["50 per hour"]
+    default_limits=["50 per hour"],
+    storage_uri=Config.REDIS_URL
 )
 
 def psycop_conn():
