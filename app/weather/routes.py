@@ -11,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 @bp.route('/', methods=['GET', 'POST'])
 @limiter.limit("15/minute", override_defaults=True)
-@roles_required('user', 'admin')
 def sensor_data():
     if request.method == 'GET':
         # We expect a start and end timestamp, if none is given assume the latest data point
@@ -26,7 +25,7 @@ def sensor_data():
         else:
             return jsonify({"success": False, 'error': "'start' and 'end' must both be provided, or not at all"}), 400
 
-        headers = ['timestamp', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
+        headers = ['timestamp', 'temperature', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
         return jsonify({'headers': headers, 'data': sensor_data} ), 200
     elif request.method == 'POST':
         data = request.json
@@ -44,6 +43,7 @@ def sensor_data():
         else:
             timestamp = datetime.now(ZoneInfo("UTC"))
         try:
+            temperature = data['temperature']
             pressure = data['pressure']
             humidity = data['humidity']
             ambient_light = data['ambient_light']
@@ -55,6 +55,6 @@ def sensor_data():
 
 
 
-        insert_sensor_data(timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2)
+        insert_sensor_data(timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2)
 
         return jsonify({'success': True}), 201

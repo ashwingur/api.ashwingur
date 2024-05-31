@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import random
 from app.extensions import psycop_conn
 from psycopg2 import sql
+from zoneinfo import ZoneInfo
 
 # Create the sensor data table and convert it to a hypertable
 def setup_sensor_data_table():
@@ -13,6 +14,7 @@ def setup_sensor_data_table():
     query_create_sensordata_table = """
     CREATE TABLE IF NOT EXISTS sensor_data (
         timestamp TIMESTAMPTZ NOT NULL,
+        temperature FLOAT,
         pressure FLOAT,
         humidity FLOAT,
         ambient_light FLOAT,
@@ -35,19 +37,19 @@ def setup_sensor_data_table():
     cur.close()
     conn.close()
 
-def insert_sensor_data(timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2):
+def insert_sensor_data(timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2):
     """
     Insert a new record into the sensor_data table.
     """
     insert_query = """
-    INSERT INTO sensor_data (timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2)
-    VALUES (%s, %s, %s, %s, %s, %s, %s);
+    INSERT INTO sensor_data (timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
     """
     # Connect to the database and execute the insert query
     conn = psycop_conn()
     with conn:
         with conn.cursor() as cur:
-            cur.execute(insert_query, (timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2))
+            cur.execute(insert_query, (timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2))
     conn.close()
 
 def get_latest_single_sensor_data():
@@ -57,7 +59,7 @@ def get_latest_single_sensor_data():
     conn = psycop_conn()
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2
+            SELECT timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2
             FROM sensor_data
             ORDER BY timestamp DESC
             LIMIT 1
@@ -66,7 +68,7 @@ def get_latest_single_sensor_data():
     conn.close()
 
     if row:
-        latest_data = [int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]]
+        latest_data = [int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]]
         return latest_data
     else:
         return []
@@ -79,14 +81,14 @@ def get_all_sensor_data():
     conn = psycop_conn()
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT timestamp, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2
+            SELECT timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2
             FROM sensor_data
             ORDER BY timestamp
         """)
         rows = cur.fetchall()
     conn.close()
 
-    sensor_data_list = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in rows]
+    sensor_data_list = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in rows]
 
     return sensor_data_list
 
@@ -124,6 +126,7 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
     query = """
     SELECT
         time_bucket(%s, timestamp) AS bucket,
+        ROUND(CAST(AVG(temperature) AS NUMERIC), 3) AS avg_temperature,
         ROUND(CAST(AVG(pressure) AS NUMERIC), 3) AS avg_pressure,
         ROUND(CAST(AVG(humidity) AS NUMERIC), 3) AS avg_humidity,
         ROUND(CAST(AVG(ambient_light) AS NUMERIC), 3) AS avg_ambient_light,
@@ -147,7 +150,7 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
     cur.close()
     conn.close()
 
-    return [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in results]
+    return [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in results]
 
 
 def execute_sensor_query(query):
@@ -160,7 +163,7 @@ def execute_sensor_query(query):
         cur.execute(query)
         results = cur.fetchall()
     conn.close()
-    results = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6]] for row in results]
+    results = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in results]
     return results
 
 def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
@@ -174,10 +177,11 @@ def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
 
     """
     # Current timestamp
-    current_timestamp = datetime.now() - timedelta(days=days_from_past)
+    current_timestamp = datetime.now(tz=ZoneInfo("UTC")) - timedelta(days=days_from_past)
     
     for i in range(n):
         # Generate reasonable random values for other columns
+        temperature = random.uniform(10, 40)  # Celsius
         pressure = random.uniform(950, 1050)  # Assuming pressure in hPa
         humidity = random.uniform(30, 90)     # Assuming humidity in %
         ambient_light = random.uniform(0, 1000) # Assuming ambient light in lux
@@ -188,6 +192,7 @@ def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
         # Call the insert function
         insert_sensor_data(
             current_timestamp,
+            temperature,
             pressure,
             humidity,
             ambient_light,
