@@ -15,12 +15,13 @@ def sensor_data():
     if request.method == 'GET':
         # We expect a start and end timestamp, if none is given assume the latest data point
         # Expecting unix timestamp
-        data = request.json
-        if 'start' not in data and 'end' not in data:
+        start_timestamp = request.args.get('start')
+        end_timestamp = request.args.get('end')
+        if start_timestamp is None and end_timestamp is None:
             sensor_data = [get_latest_single_sensor_data()]
-        elif 'start' in data and 'end' in data:
-            start = datetime.fromtimestamp(data.get('start'), tz=ZoneInfo("UTC")) 
-            end = datetime.fromtimestamp(data.get('end'), tz=ZoneInfo("UTC")) 
+        elif start_timestamp is not None and end_timestamp is not None:
+            start = datetime.fromtimestamp(float(start_timestamp), tz=ZoneInfo("UTC")) 
+            end = datetime.fromtimestamp(float(end_timestamp), tz=ZoneInfo("UTC")) 
             sensor_data = get_sensor_data_between_timestamps(start, end)
         else:
             return jsonify({"success": False, 'error': "'start' and 'end' must both be provided, or not at all"}), 400
@@ -52,7 +53,6 @@ def sensor_data():
             eCO2 = data['eCO2']
         except KeyError as e:
             return jsonify({'success': False, 'error': f"value not provided: {e}"}), 400
-
 
 
         insert_sensor_data(timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2)
