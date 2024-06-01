@@ -10,7 +10,7 @@ from app.extensions import roles_required
 from zoneinfo import ZoneInfo
 
 @bp.route('', methods=['GET', 'POST'])
-@limiter.limit("15/minute", override_defaults=True)
+@limiter.limit("30/minute", override_defaults=True)
 def sensor_data():
     if request.method == 'GET':
         # We expect a start and end timestamp, if none is given assume the latest data point
