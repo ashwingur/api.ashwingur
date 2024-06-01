@@ -9,7 +9,7 @@ from app.models.weather_data import insert_sensor_data, get_sensor_data_between_
 from app.extensions import roles_required
 from zoneinfo import ZoneInfo
 
-@bp.route('/', methods=['GET', 'POST'])
+@bp.route('', methods=['GET', 'POST'])
 @limiter.limit("15/minute", override_defaults=True)
 def sensor_data():
     if request.method == 'GET':
