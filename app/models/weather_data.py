@@ -126,13 +126,13 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
     query = """
     SELECT
         time_bucket(%s, timestamp) AS bucket,
-        ROUND(CAST(AVG(temperature) AS NUMERIC), 3) AS avg_temperature,
-        ROUND(CAST(AVG(pressure) AS NUMERIC), 3) AS avg_pressure,
-        ROUND(CAST(AVG(humidity) AS NUMERIC), 3) AS avg_humidity,
-        ROUND(CAST(AVG(ambient_light) AS NUMERIC), 3) AS avg_ambient_light,
-        ROUND(CAST(AVG(air_quality_index) AS NUMERIC), 3) AS avg_air_quality_index,
-        ROUND(CAST(AVG(TVOC) AS NUMERIC), 3) AS avg_TVOC,
-        ROUND(CAST(AVG(eCO2) AS NUMERIC), 3) AS avg_eCO2
+        ROUND(AVG(temperature)::numeric, 3)::float AS avg_temperature,
+        ROUND(AVG(pressure)::numeric, 3)::float AS avg_pressure,
+        ROUND(AVG(humidity)::numeric, 3)::float AS avg_humidity,
+        ROUND(AVG(ambient_light)::numeric, 3)::float AS avg_ambient_light,
+        ROUND(AVG(air_quality_index), 3)::float AS avg_air_quality_index,
+        ROUND(AVG(TVOC), 3)::float AS avg_TVOC,
+        ROUND(AVG(eCO2), 3)::float AS avg_eCO2
     FROM
         sensor_data
     WHERE
