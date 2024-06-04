@@ -12,4 +12,5 @@ EXPOSE 5000
 
 ENV FLASK_ENV=development
 
+# Only 1 worker thread, otherwise flask socket messes up
 CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--worker-class", "eventlet", "app:create_app()"]

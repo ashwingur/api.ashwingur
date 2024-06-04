@@ -137,6 +137,5 @@ def ping():
     emit('connected_users', {"connected_users": connected_users})
 
 @socketio.on('ping', namespace=NAMESPACE)
-def ping():
-    print("PING received", file=sys.stderr)
-    emit("pong")
+def ping(data):
+    emit("pong", data)
