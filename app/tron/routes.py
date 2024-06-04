@@ -50,7 +50,7 @@ def client_connect():
     print(f"Client connected. Total connected users: {connected_users}", file=sys.stderr)
 
 def generate_room_code():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
 
 @socketio.on('create_room', namespace=NAMESPACE)
 def create_room(data: Dict[str, int]):
@@ -116,6 +116,21 @@ def my_join_room(data: Dict[str, str]):
     room.players.append(request.sid)
     emit('join_room', {'success': True, 'room': room.serialise()})
 
+@socketio.on('leave_room', namespace=NAMESPACE)
+def my_leave_room():
+    # Find the rooms the user is a part of and remove them from it
+    rooms_to_delete = []
+    for code, room in rooms.items():
+        if request.sid in room.players:
+            room.players.remove(request.sid)
+            if len(room.players) == 0:
+                rooms_to_delete.append(code)
+            leave_room(code)
+    for code in rooms_to_delete:
+        del rooms[code]
+    emit('leave_room')
+
+
 @socketio.on('disconnect', namespace=NAMESPACE)
 def client_disconnect():
     print(f"Client disconnected (SID: {request.sid})", file=sys.stderr)
@@ -126,6 +141,7 @@ def client_disconnect():
     rooms_to_delete = []
     for code, room in rooms.items():
         if request.sid in room.players:
+            leave_room(code)
             room.players.remove(request.sid)
             if len(room.players) == 0:
                 rooms_to_delete.append(code)
