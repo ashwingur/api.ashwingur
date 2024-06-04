@@ -1,8 +1,10 @@
 flask
-psycopg2-binary
-Flask-SQLAlchemy
-gunicorn
 Flask-Limiter
 Flask-Cors
 flask-login
+Flask-SQLAlchemy
+Flask-SocketIO
+psycopg2-binary
 redis
+gunicorn
+eventlet

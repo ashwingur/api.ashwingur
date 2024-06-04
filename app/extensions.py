@@ -7,12 +7,15 @@ import psycopg2
 from flask_cors import CORS
 from flask_login import LoginManager, current_user
 from config import Config
+from flask_socketio import SocketIO
 
 db = SQLAlchemy()
 
 cors = CORS()
 
 login_manager = LoginManager()
+
+socketio = SocketIO()
 
 limiter = Limiter(
     get_remote_address,

@@ -1,7 +1,7 @@
 from flask import Flask
 import os
 from config import Config
-from app.extensions import db, limiter, cors, login_manager
+from app.extensions import db, limiter, cors, login_manager, socketio
 
 
 def create_app(config_class=Config):
@@ -29,6 +29,8 @@ def create_app(config_class=Config):
     limiter.init_app(app)
     # Initialise login manager
     login_manager.init_app(app)
+    # Initialise websocket module
+    socketio.init_app(app, cors_allowed_origins="*")
 
     # Register blueprints
     from app.main import bp as main_bp
@@ -39,5 +41,8 @@ def create_app(config_class=Config):
 
     from app.weather import bp as weather_bp
     app.register_blueprint(weather_bp, url_prefix='/weather')
+
+    from app.tron import bp as tron_bp
+    app.register_blueprint(tron_bp, url_prefix='/tron')
     
     return app
