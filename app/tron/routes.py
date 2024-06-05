@@ -27,16 +27,19 @@ class Player:
 
 
 class TronRoom:
-    def __init__(self, max_players: int, room_code: str, grid_size: int=200) -> None:
+    def __init__(self, max_players: int, room_code: str) -> None:
         if max_players < 2:
             max_players = 2
-        elif max_players > 4:
-            max_players = 4
+        elif max_players > 6:
+            max_players = 6
         self.max_players = max_players
         self.game_started = False
         self.players: List[Player] = []
         self.room_code = room_code
-        self.grid_size = grid_size
+        if max_players <= 4:
+            self.grid_size = 200
+        else:
+            self.grid_size = 300
         self.grid: List[List[str|None]] = None # Only initialise this when we're about to start the game
 
     def start_game(self):
@@ -58,11 +61,26 @@ class TronRoom:
             self.set_player_position(1, (self.grid_size - 20, self.grid_size - 20), 'UP')
             self.set_player_position(2, (20, self.grid_size - 20), 'RIGHT')
         elif len(self.players) == 4:
-            # For 3 players start in corners as well
+            # For 4 players start in corners as well
             self.set_player_position(0, (20, 20), 'DOWN')
             self.set_player_position(1, (self.grid_size - 20, self.grid_size - 20), 'UP')
             self.set_player_position(2, (20, self.grid_size - 20), 'RIGHT')
             self.set_player_position(3, (self.grid_size - 20, 20), 'LEFT')
+        elif len(self.players) == 5:
+            # Like 4 players, but 1 in the centre with a random direction
+            self.set_player_position(0, (40, 40), 'DOWN')
+            self.set_player_position(1, (self.grid_size - 40, self.grid_size - 40), 'UP')
+            self.set_player_position(2, (40, self.grid_size - 40), 'RIGHT')
+            self.set_player_position(3, (self.grid_size - 40, 40), 'LEFT')
+            self.set_player_position(4, (self.grid_size//2, self.grid_size//2), random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT']))
+        elif len(self.players) == 6:
+            # Like a dice
+            self.set_player_position(0, (40, 40), 'DOWN')
+            self.set_player_position(1, (self.grid_size - 40, self.grid_size - 40), 'UP')
+            self.set_player_position(2, (40, self.grid_size - 40), 'UP')
+            self.set_player_position(3, (self.grid_size - 40, 40), 'DOWN')
+            self.set_player_position(4, (self.grid_size//2, 40), "DOWN")
+            self.set_player_position(5, (self.grid_size//2, self.grid_size - 40), "DOWN")
     
     def set_player_position(self, index, position: Tuple[int, int], direction:str):
         if index < len(self.players) and direction in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
@@ -112,7 +130,6 @@ def create_room(data: Dict[str, int]):
         error?: string;
     }
     '''
-    print(f"Create room called, {data}", file=sys.stderr)
     # Check if player is already in a room
     for code, room in rooms.items():
         if request.sid in room.players:
@@ -146,7 +163,6 @@ def my_join_room(data: Dict[str, str]):
         error?: string;
     }
     '''
-    print(f"Join room called, {data}", file=sys.stderr)
         # Check if player is already in a room
     for code, room in rooms.items():
         if any(player.sid == request.sid for player in room.players):
@@ -223,6 +239,9 @@ def start_game(room: TronRoom):
 
 def run_game(room: TronRoom):
     collided_players = set()
+
+    # Emit starting position
+    emit('game_tick', {'positions': {player.sid: player.position for player in room.players}}, room=room.room_code)
     
     while room.game_started and len(collided_players) < len(room.players) - 1:
         for player in room.players:
@@ -247,11 +266,11 @@ def run_game(room: TronRoom):
             if room.grid[new_position[0]][new_position[1]] is not None:
                 collided_players.add(player.sid)
                 emit('collision', {'sid': player.sid, 'position': player.position}, room=room.room_code)
-            else:
-                # Update position and grid
-                room.grid[player.position[0]][player.position[1]] = player.sid  # Mark old position
-                player.position = tuple(new_position)
-                room.grid[player.position[0]][player.position[1]] = player.sid  # Mark new position
+      
+            # Update position and grid
+            room.grid[player.position[0]][player.position[1]] = player.sid  # Mark old position
+            player.position = tuple(new_position)
+            room.grid[player.position[0]][player.position[1]] = player.sid  # Mark new position
 
         emit('game_tick', {'positions': {player.sid: player.position for player in room.players}}, room=room.room_code)
         socketio.sleep(1 / 30)  # 15 actions per second
