@@ -16,18 +16,18 @@ class Player:
 
     def set_colour(self, index: int):
         colour_map = {
-            0: '#0000FF',  # Blue
-            1: '#FFA500',  # Orange
-            2: '#008000',  # Green
-            3: '#800080',  # Purple
-            4: '#FF0000',  # Red
-            5: '#FFFF00'   # Yellow
+            0: '#3ed9de',  # Blue
+            1: '#cf7c34',  # Orange
+            2: '#3bcc33',  # Green
+            3: '#7033cc',  # Purple
+            4: '#cc3333',  # Red
+            5: '#cccc33'   # Yellow
         }
         self.colour = colour_map.get(index, '#FFFFFF')  # Default to white
 
 
 class TronRoom:
-    def __init__(self, max_players: int, room_code: str) -> None:
+    def __init__(self, max_players: int, room_code: str, grid_size: int=200) -> None:
         if max_players < 2:
             max_players = 2
         elif max_players > 4:
@@ -36,14 +36,39 @@ class TronRoom:
         self.game_started = False
         self.players: List[Player] = []
         self.room_code = room_code
+        self.grid_size = grid_size
+        self.grid: List[List[str|None]] = None # Only initialise this when we're about to start the game
 
     def start_game(self):
         self.game_started = True
-        # Initialize player positions and directions
+        self.grid = [[None for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        # Initialize player colours
         for index, player in enumerate(self.players):
-            player.position = (10, 10)  # Starting positions
-            player.direction = 'DOWN'  # Starting direction
             player.set_colour(index) # Assign final colour
+        self.init_player_position_and_direction()
+
+    def init_player_position_and_direction(self):
+        if len(self.players) == 2:
+            # For 2 players start at opposite corners
+            self.set_player_position(0, (20, 20), 'DOWN')
+            self.set_player_position(1, (self.grid_size - 20, self.grid_size - 20), 'UP')
+        elif len(self.players) == 3:
+            # For 3 players start in corners as well
+            self.set_player_position(0, (20, 20), 'DOWN')
+            self.set_player_position(1, (self.grid_size - 20, self.grid_size - 20), 'UP')
+            self.set_player_position(2, (20, self.grid_size - 20), 'RIGHT')
+        elif len(self.players) == 4:
+            # For 3 players start in corners as well
+            self.set_player_position(0, (20, 20), 'DOWN')
+            self.set_player_position(1, (self.grid_size - 20, self.grid_size - 20), 'UP')
+            self.set_player_position(2, (20, self.grid_size - 20), 'RIGHT')
+            self.set_player_position(3, (self.grid_size - 20, 20), 'LEFT')
+    
+    def set_player_position(self, index, position: Tuple[int, int], direction:str):
+        if index < len(self.players) and direction in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
+            self.players[index].position = position
+            self.players[index].direction = direction
+
 
     def __repr__(self) -> str:
         return f'Max players: {self.max_players}, players: {len(self.players)}, game_started: {self.game_started}'
@@ -53,7 +78,8 @@ class TronRoom:
             'max_players': self.max_players,
             'players': [{'sid': p.sid, 'colour': p.colour, 'position': p.position, 'direction': p.direction} for p in self.players],
             'game_started': self.game_started,
-            'room_code': self.room_code
+            'room_code': self.room_code,
+            'grid_size': self.grid_size
         }
 
 NAMESPACE = '/tron'
@@ -191,24 +217,65 @@ def ping(data):
 
 def start_game(room: TronRoom):
     room.start_game()
-    emit('game_start', {'room': room.serialise(), 'countdown': 3}, room=room.room_code)
-    socketio.sleep(3)  # Countdown
+    emit('game_start', {'room': room.serialise(), 'countdown': 5}, room=room.room_code)
+    socketio.sleep(5)  # Countdown
     run_game(room)
 
 def run_game(room: TronRoom):
-    while room.game_started and room.players:
+    collided_players = set()
+    
+    while room.game_started and len(collided_players) < len(room.players) - 1:
         for player in room.players:
+            if player.sid in collided_players:
+                continue
+
+            new_position = list(player.position)
             if player.direction == 'UP':
-                player.position = (player.position[0], player.position[1] - 1)
+                new_position[1] -= 1
             elif player.direction == 'DOWN':
-                player.position = (player.position[0], player.position[1] + 1)
+                new_position[1] += 1
             elif player.direction == 'LEFT':
-                player.position = (player.position[0] - 1, player.position[1])
+                new_position[0] -= 1
             elif player.direction == 'RIGHT':
-                player.position = (player.position[0] + 1, player.position[1])
+                new_position[0] += 1
+
+            # Wrap around grid boundaries
+            new_position[0] %= room.grid_size
+            new_position[1] %= room.grid_size
+
+            # Check for collisions
+            if room.grid[new_position[0]][new_position[1]] is not None:
+                collided_players.add(player.sid)
+                emit('collision', {'sid': player.sid, 'position': player.position}, room=room.room_code)
+            else:
+                # Update position and grid
+                room.grid[player.position[0]][player.position[1]] = player.sid  # Mark old position
+                player.position = tuple(new_position)
+                room.grid[player.position[0]][player.position[1]] = player.sid  # Mark new position
 
         emit('game_tick', {'positions': {player.sid: player.position for player in room.players}}, room=room.room_code)
-        socketio.sleep(1 / 15)  # 15 actions per second
+        socketio.sleep(1 / 30)  # 15 actions per second
+
+    
+    # We have a winner
+    remaining_player = next((player for player in room.players if player.sid not in collided_players), None)
+    if remaining_player is None:
+        # Edge case where there's a tie (2 or more remaining players collided in the same tick)
+        emit('game_over', {'tie': True},room=room.room_code)
+    else:
+        emit('game_over', {'winner': remaining_player.sid, 'colour': remaining_player.colour}, room=room.room_code)
+
+    room.game_started = False
+
+    # Make all players leave the room after some sleep
+    socketio.sleep(2)
+    for player in room.players:
+        emit('leave_room', room=player.sid)
+        leave_room(room.room_code, sid=player.sid)
+
+    # Clean up the room
+    del rooms[room.room_code]
+
 
 
 @socketio.on('change_direction', namespace=NAMESPACE)
@@ -222,5 +289,14 @@ def change_direction(data: Dict[str, str]):
         player = next((p for p in room.players if p.sid == request.sid), None)
         
         if player and direction in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
+            # Make sure the player doesnt try to turn more than 180 degrees at once
+            if player.direction == 'UP' and direction == 'DOWN':
+                return
+            if player.direction == 'DOWN' and direction == 'UP':
+                return
+            if player.direction == 'LEFT' and direction == 'RIGHT':
+                return
+            if player.direction == 'RIGHT' and direction == 'LEFT':
+                return
             player.direction = direction
 
