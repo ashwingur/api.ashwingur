@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import abort
+from flask import abort, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -7,7 +7,8 @@ import psycopg2
 from flask_cors import CORS
 from flask_login import LoginManager, current_user
 from config import Config
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
+from redis import Redis
 
 db = SQLAlchemy()
 
@@ -22,6 +23,7 @@ limiter = Limiter(
     default_limits=["50 per hour"],
     storage_uri=Config.REDIS_URL
 )
+
 
 def psycop_conn():
     return psycopg2.connect(Config.SQLALCHEMY_DATABASE_URI)
@@ -38,3 +40,34 @@ def roles_required(*roles):
         return decorated_function
     return wrapper
 
+
+redis_client = Redis.from_url(Config.REDIS_URL)
+
+def socket_rate_limit(limit: int=15, window: int=60):
+    """
+    Custom rate limiter for Socket.IO events.
+
+    :param limit: Number of allowed requests within the time window.
+    :param window: Time window in seconds.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            remote_address = request.remote_addr
+            key = f"rl:{remote_address}:{f.__name__}"
+            current = redis_client.get(key)
+
+            if current and int(current) >= limit:
+                emit('rate_limit_exceeded', {'message': 'Rate limit exceeded. Try again later.'})
+                return
+
+            if not current:
+                redis_client.set(key, 1, ex=window)
+            else:
+                redis_client.incr(key)
+
+            return f(*args, **kwargs)
+
+        return wrapped
+
+    return decorator

@@ -2,7 +2,7 @@ import random
 import string
 from flask import render_template, request
 from app.tron import bp
-from app.extensions import socketio, limiter
+from app.extensions import socketio, limiter, socket_rate_limit
 from flask_socketio import emit, join_room, leave_room
 import sys
 from typing import Dict, Tuple, List
@@ -41,8 +41,8 @@ class TronRoom:
         self.game_started = True
         # Initialize player positions and directions
         for index, player in enumerate(self.players):
-            player.position = (0, 0)  # Starting positions
-            player.direction = 'UP'  # Starting direction
+            player.position = (10, 10)  # Starting positions
+            player.direction = 'DOWN'  # Starting direction
             player.set_colour(index) # Assign final colour
 
     def __repr__(self) -> str:
@@ -76,6 +76,7 @@ def generate_room_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
 
 @socketio.on('create_room', namespace=NAMESPACE)
+@socket_rate_limit(limit=15, window=60)
 def create_room(data: Dict[str, int]):
     '''
     Response template:
@@ -109,6 +110,7 @@ def list_rooms():
 
 
 @socketio.on('join_room', namespace=NAMESPACE)
+@socket_rate_limit(limit=15, window=60)
 def my_join_room(data: Dict[str, str]):
     '''
     Response template:
@@ -206,10 +208,11 @@ def run_game(room: TronRoom):
                 player.position = (player.position[0] + 1, player.position[1])
 
         emit('game_tick', {'positions': {player.sid: player.position for player in room.players}}, room=room.room_code)
-        socketio.sleep(1 / 3)  # 15 actions per second
+        socketio.sleep(1 / 15)  # 15 actions per second
 
 
 @socketio.on('change_direction', namespace=NAMESPACE)
+@socket_rate_limit(limit=10, window=1)
 def change_direction(data: Dict[str, str]):
     room_code = data['room_code']
     direction = data['direction']
