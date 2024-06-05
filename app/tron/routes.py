@@ -5,12 +5,9 @@ from app.tron import bp
 from app.extensions import socketio, limiter
 from flask_socketio import emit, join_room, leave_room
 import sys
-from typing import Dict
-
-# CAN THIS ONLY WORK WITH 1 WORKER THREAD? OTHERWISE THEY CANT TALK TO EACH OTHER
+from typing import Dict, Tuple, List
 
 class TronRoom:
-
     def __init__(self, max_players: int, room_code: str) -> None:
         if max_players < 2:
             max_players = 2
@@ -18,8 +15,17 @@ class TronRoom:
             max_players = 4
         self.max_players = max_players
         self.game_started = False
-        self.players = []
+        self.players: List[str] = []
         self.room_code = room_code
+        self.player_positions: Dict[str, Tuple[int, int]] = {}
+        self.player_directions: Dict[str, str] = {}
+
+    def start_game(self):
+        self.game_started = True
+        # Initialize player positions and directions
+        for player in self.players:
+            self.player_positions[player] = (0, 0)  # Starting positions
+            self.player_directions[player] = 'UP'  # Starting direction
 
     def __repr__(self) -> str:
         return f'Max players: {self.max_players}, players: {self.players}, game_started: {self.game_started}'
@@ -31,7 +37,6 @@ class TronRoom:
             'game_started': self.game_started,
             'room_code': self.room_code
         }
-
         
 
 NAMESPACE = '/tron'
@@ -116,6 +121,10 @@ def my_join_room(data: Dict[str, str]):
     room.players.append(request.sid)
     emit('join_room', {'success': True, 'room': room.serialise()})
 
+    # If the room is full we can start the game!
+    if len(room.players) == room.max_players:
+        start_game(room)
+
 @socketio.on('leave_room', namespace=NAMESPACE)
 def my_leave_room():
     # Find the rooms the user is a part of and remove them from it
@@ -155,3 +164,32 @@ def ping():
 @socketio.on('ping', namespace=NAMESPACE)
 def ping(data):
     emit("pong", data)
+
+def start_game(room: TronRoom):
+    room.start_game()
+    emit('game_start', {'room': room.serialise(), 'countdown': 3}, room=room.room_code)
+    socketio.sleep(3)  # Countdown
+    run_game(room)
+
+def run_game(room: TronRoom):
+    while room.game_started and room.players:
+        for player in room.players:
+            if room.player_directions[player] == 'UP':
+                room.player_positions[player] = (room.player_positions[player][0], room.player_positions[player][1] - 1)
+            elif room.player_directions[player] == 'DOWN':
+                room.player_positions[player] = (room.player_positions[player][0], room.player_positions[player][1] + 1)
+            elif room.player_directions[player] == 'LEFT':
+                room.player_positions[player] = (room.player_positions[player][0] - 1, room.player_positions[player][1])
+            elif room.player_directions[player] == 'RIGHT':
+                room.player_positions[player] = (room.player_positions[player][0] + 1, room.player_positions[player][1])
+
+        emit('game_tick', {'positions': room.player_positions}, room=room.room_code)
+        socketio.sleep(1 / 15)  # 15 actions per second
+
+@socketio.on('change_direction', namespace=NAMESPACE)
+def change_direction(data: Dict[str, str]):
+    room_code = data['room_code']
+    direction = data['direction']
+    if room_code in rooms and request.sid in rooms[room_code].players:
+        if direction in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
+            rooms[room_code].player_directions[request.sid] = direction
