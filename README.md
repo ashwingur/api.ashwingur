@@ -30,7 +30,7 @@ docker compose up --build flask_app
 
 ## .env file
 
-This is required and should be manually created in the base folder
+This is required and should be manually created in the root folder
 
 ```
 POSTGRES_USER=abc
