@@ -24,7 +24,7 @@ def create_app(config_class=Config):
     setup_sensor_data_table()
 
     # Initialise CORS for auth
-    cors.init_app(app, supports_credentials=True)
+    cors.init_app(app, resources={r"/*": {"origins": "*", "supports_credentials": True}})
     # Initialise rate limiter
     limiter.init_app(app)
     # Initialise login manager
