@@ -41,32 +41,32 @@ def convert_files():
                 img.save(byte_io, format=format)
             byte_io.seek(0)
             converted_files.append((file.filename, byte_io))
-        elif file.content_type in ['video/mp4', 'video/x-matroska']:
-            byte_io = io.BytesIO()
-            temp_input = io.BytesIO(file.read())
-            temp_input.seek(0)
+        # elif file.content_type in ['video/mp4', 'video/x-matroska']:
+        #     byte_io = io.BytesIO()
+        #     temp_input = io.BytesIO(file.read())
+        #     temp_input.seek(0)
 
-            # Create a temporary file for moviepy to read from
-            temp_input_file = f"/tmp/input_{file.filename}"
-            with open(temp_input_file, 'wb') as f:
-                f.write(temp_input.getbuffer())
+        #     # Create a temporary file for moviepy to read from
+        #     temp_input_file = f"/tmp/input_{file.filename}"
+        #     with open(temp_input_file, 'wb') as f:
+        #         f.write(temp_input.getbuffer())
 
-            clip = VideoFileClip(temp_input_file)
+        #     clip = VideoFileClip(temp_input_file)
 
-            temp_output_file = f"/tmp/output_{file.filename}.{format}"
-            if format in ['mp4', 'mkv']:
-                codec = 'libx264' if format == 'mp4' else 'libvpx-vp9'
-                clip.write_videofile(temp_output_file, codec=codec, audio_codec='aac')
+        #     temp_output_file = f"/tmp/output_{file.filename}.{format}"
+        #     if format in ['mp4', 'mkv']:
+        #         codec = 'libx264' if format == 'mp4' else 'libvpx-vp9'
+        #         clip.write_videofile(temp_output_file, codec=codec, audio_codec='aac')
 
-            with open(temp_output_file, 'rb') as f:
-                byte_io.write(f.read())
+        #     with open(temp_output_file, 'rb') as f:
+        #         byte_io.write(f.read())
 
-            byte_io.seek(0)
-            converted_files.append((file.filename, byte_io))
+        #     byte_io.seek(0)
+        #     converted_files.append((file.filename, byte_io))
 
-            # Clean up temporary files
-            os.remove(temp_input_file)
-            os.remove(temp_output_file)
+        #     # Clean up temporary files
+        #     os.remove(temp_input_file)
+        #     os.remove(temp_output_file)
         else:
             # Handle other file types
             byte_io = io.BytesIO(file.read())
