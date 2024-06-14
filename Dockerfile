@@ -1,5 +1,8 @@
 FROM python:3.10-slim-buster
 
+# Install Ghostscript (for EPS file conversions)
+RUN apt-get update && apt-get install -y ghostscript
+
 WORKDIR /app
 
 COPY requirements.txt ./

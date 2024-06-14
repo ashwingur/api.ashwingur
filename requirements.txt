@@ -9,4 +9,3 @@ redis
 gunicorn
 eventlet
 pillow
-moviepy
