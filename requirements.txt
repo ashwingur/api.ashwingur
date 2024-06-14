@@ -8,3 +8,4 @@ psycopg2-binary
 redis
 gunicorn
 eventlet
+pillow

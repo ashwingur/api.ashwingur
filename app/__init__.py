@@ -44,5 +44,8 @@ def create_app(config_class=Config):
 
     from app.tron import bp as tron_bp
     app.register_blueprint(tron_bp, url_prefix='/tron')
+
+    from app.filetools import bp as filetools_bp
+    app.register_blueprint(filetools_bp, url_prefix='/filetools')
     
     return app
