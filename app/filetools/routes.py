@@ -34,7 +34,7 @@ def convert_files():
 
                 # If the file is an EPS, Pillow uses Ghostscript to process it
                 if file.filename.lower().endswith('.eps'):
-                    img.load(scale=10)  # Increase resolution for better quality
+                    img.load(scale=5)  # Increase resolution for better quality
                     img = img.convert('RGB')  # Convert to RGB mode
 
                 byte_io = io.BytesIO()
