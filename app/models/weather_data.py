@@ -229,8 +229,8 @@ def get_sensor_stats_between_timestamps(start: datetime, end: datetime):
         finally:
             conn.close()
 
-        min_result = next(({'timestamp': int(row[0].timestamp()), metric: round(float(row[1]), 3)} for row in results if row[1] == row[2]), None)
-        max_result = next(({'timestamp': int(row[0].timestamp()), metric: round(float(row[1]), 3)} for row in results if row[1] == row[3]), None)
+        min_result = next(({'timestamp': int(row[0].timestamp()), 'value': round(float(row[1]), 3)} for row in results if row[1] == row[2]), None)
+        max_result = next(({'timestamp': int(row[0].timestamp()), 'value': round(float(row[1]), 3)} for row in results if row[1] == row[3]), None)
         average_value = round(float(avg_result[0]), 3) if avg_result else None
 
         result[metric] = {
