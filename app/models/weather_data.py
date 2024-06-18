@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
 import random
+import sys
 from app.extensions import psycop_conn
 from psycopg2 import sql
 from zoneinfo import ZoneInfo
+from sqlalchemy import text
 
 # Create the sensor data table and convert it to a hypertable
 def setup_sensor_data_table():
@@ -151,6 +153,93 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
     conn.close()
 
     return [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in results]
+
+
+def get_sensor_stats_between_timestamps(start: datetime, end: datetime):
+    """
+    Retrieve the minimum, maximum, and average values for all metrics within the specified time range, aggregated in 15-minute buckets.
+    
+    Parameters:
+    - start: The start timestamp (datetime object).
+    - end: The end timestamp (datetime object).
+    
+    Returns:
+    - result: A dictionary where the key is the metric name and the value is another dictionary containing 'min', 'max', and 'average' values.
+    """
+    metrics = ['temperature', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
+    result = {}
+    
+    for metric in metrics:
+        query = f"""
+        WITH bucketed_data AS (
+            SELECT
+                time_bucket('15 minutes', timestamp) AS bucket,
+                AVG({metric}) AS avg_{metric}
+            FROM
+                sensor_data
+            WHERE
+                timestamp BETWEEN %s AND %s
+            GROUP BY
+                bucket
+        ),
+        min_max_temps AS (
+            SELECT
+                bucket,
+                avg_{metric},
+                MIN(avg_{metric}) OVER () AS min_temp,
+                MAX(avg_{metric}) OVER () AS max_temp
+            FROM
+                bucketed_data
+        )
+        SELECT
+            bucket AS timestamp,
+            avg_{metric} AS {metric},
+            min_temp,
+            max_temp
+        FROM
+            min_max_temps
+        WHERE
+            avg_{metric} = min_temp OR avg_{metric} = max_temp;
+        """
+
+        avg_query = f"""
+        SELECT
+            AVG({metric}) AS average_{metric}
+        FROM
+            sensor_data
+        WHERE
+            timestamp BETWEEN %s AND %s;
+        """
+
+        conn = psycop_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(query, (start, end))
+            results = cur.fetchall()
+
+            # If no data is found for this metric, return an empty dictionary
+            if not results:
+                cur.close()
+                return {}
+
+            cur.execute(avg_query, (start, end))
+            avg_result = cur.fetchone()
+
+            cur.close()
+        finally:
+            conn.close()
+
+        min_result = next(({'timestamp': int(row[0].timestamp()), metric: round(float(row[1]), 3)} for row in results if row[1] == row[2]), None)
+        max_result = next(({'timestamp': int(row[0].timestamp()), metric: round(float(row[1]), 3)} for row in results if row[1] == row[3]), None)
+        average_value = round(float(avg_result[0]), 3) if avg_result else None
+
+        result[metric] = {
+            'min': min_result,
+            'max': max_result,
+            'average': average_value
+        }
+    
+    return result
 
 
 def execute_sensor_query(query):
