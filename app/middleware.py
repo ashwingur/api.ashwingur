@@ -10,10 +10,21 @@ def log_request():
         timestamp = datetime.now(ZoneInfo("UTC"))
 
         # Get the client IP address from the request headers
-        user_ip = request.headers.get('X-Real-IP', request.remote_addr)
+        x_real_ip = request.headers.get('X-Real-IP')
+        x_forwarded_for = request.headers.get('X-Forwarded-For')
 
-        print(f"X-Real-IP: {request.headers.get('X-Real-IP')}", file=sys.stderr)
-        
+        if x_forwarded_for:
+            user_ip = x_forwarded_for.split(',')[0]
+        elif x_real_ip:
+            user_ip = x_real_ip
+        else:
+            user_ip = request.remote_addr
+
+        # Debug log to verify headers and IPs
+        print(f"X-Real-IP: {x_real_ip}", file=sys.stderr)
+        print(f"X-Forwarded-For: {x_forwarded_for}", file=sys.stderr)
+        print(f"Captured IP: {user_ip}\n", file=sys.stderr)
+
         endpoint = request.endpoint
         method = request.method
 
