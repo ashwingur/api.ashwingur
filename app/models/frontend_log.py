@@ -41,7 +41,7 @@ def get_frontend_log_per_bucket(
 
     # Add endpoint filter if specified
     if route:
-        query = query.filter(FrontendLog.endpoint.like(f"{route}%"))
+        query = query.filter(FrontendLog.route.like(f"{route}%"))
     
     # Add time range filter if specified
     if start_time:
