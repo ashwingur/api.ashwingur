@@ -1,5 +1,6 @@
 import sys
-from flask import request, Flask
+import uuid
+from flask import g, make_response, request, Flask
 from datetime import datetime
 from app.models.request_log import RequestLog
 from app.extensions import db
@@ -8,29 +9,29 @@ from zoneinfo import ZoneInfo
 def log_request():
     if request.endpoint != 'static':
         timestamp = datetime.now(ZoneInfo("UTC"))
-
-        # Get the client IP address from the request headers
-        x_real_ip = request.headers.get('X-Real-IP')
-        x_forwarded_for = request.headers.get('X-Forwarded-For')
-
-        if x_forwarded_for:
-            user_ip = x_forwarded_for.split(',')[0]
-        elif x_real_ip:
-            user_ip = x_real_ip
-        else:
-            user_ip = request.remote_addr
-
-        # Debug log to verify headers and IPs
-        print(f"X-Real-IP: {x_real_ip}", file=sys.stderr)
-        print(f"X-Forwarded-For: {x_forwarded_for}", file=sys.stderr)
-        print(f"Captured IP: {user_ip}\n", file=sys.stderr)
-
+        user_id = g.user_id
         endpoint = request.endpoint
         method = request.method
 
-        log_entry = RequestLog(user_ip=user_ip, endpoint=endpoint, method=method, timestamp=timestamp)
+        log_entry = RequestLog(user_id=user_id, endpoint=endpoint, method=method, timestamp=timestamp)
         db.session.add(log_entry)
         db.session.commit()
 
+        # If a new user_id was set, update the response to include the cookie
+        if g.new_user_id:
+            response = make_response()
+            response.set_cookie('user_id', g.new_user_id)
+            return response
+
+def set_user_cookie():
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        user_id = str(uuid.uuid4())
+        g.new_user_id = user_id  # Store in g to use later in the response
+    else:
+        g.new_user_id = None
+    g.user_id = user_id
+
 def register_middlewares(app: Flask):
+    app.before_request(set_user_cookie)
     app.before_request(log_request)

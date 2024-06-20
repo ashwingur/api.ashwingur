@@ -11,9 +11,6 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     app.secret_key = os.environ.get('FLASK_SECRET_KEY')
 
-    # Apply ProxyFix, this will allow unique users to be monitored
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
-
 
     # Initialise flask extensions
     # Initialise sqlalchemy db

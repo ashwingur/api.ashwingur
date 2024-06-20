@@ -6,9 +6,8 @@ from sqlalchemy import func
 
 class RequestLog(db.Model):
     __tablename__ = 'request_logs'
-    # id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), primary_key=True)
-    user_ip = db.Column(db.Text)
+    user_id = db.Column(db.Text)
     endpoint = db.Column(db.Text)
     method = db.Column(db.Text)
 
@@ -38,7 +37,7 @@ def get_requests_per_bucket(
     query = db.session.query(
         func.time_bucket(bucket_size, RequestLog.timestamp).label('bucket'),
         func.count(RequestLog.timestamp).label('total_count'),
-        func.count(func.distinct(RequestLog.user_ip)).label('unique_user_count')
+        func.count(func.distinct(RequestLog.user_id)).label('unique_user_count')
     ).group_by('bucket').order_by('bucket')
 
     # Add endpoint filter if specified
