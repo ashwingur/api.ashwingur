@@ -1,8 +1,56 @@
 import sys
+
+from flask import jsonify, request
 from app.analytics import bp
 from app.models.request_log import get_requests_per_bucket
+from datetime import datetime
 
 @bp.route('/requests', methods=['GET'])
 def get_requests():
-    print(get_requests_per_bucket(), file=sys.stderr)
-    return {}, 200
+    if request.method == 'GET':
+        params = request.args
+        endpoint = params.get('endpoint', None)
+        start_time_str = params.get('start_time', None)
+        end_time_str = params.get('end_time', None)
+
+        # List of allowed parameters
+        allowed_params = {'endpoint', 'start_time', 'end_time'}
+        
+        # Check for unknown parameters
+        unknown_params = set(params.keys()) - allowed_params
+        if unknown_params:
+            return jsonify({'error': f'Unknown parameters: {", ".join(unknown_params)}'}), 400
+
+        # Parse datetime parameters
+        start_time = parse_datetime(start_time_str) if start_time_str else None
+        end_time = parse_datetime(end_time_str) if end_time_str else None
+        
+        if (start_time_str and start_time is None) or (end_time_str and end_time is None):
+            return jsonify({'error': 'Invalid datetime format. Use YYYY-MM-DDTHH:MM:SS'}), 400
+        
+        # Determine the appropriate bucket size based on the date range
+        bucket_size = determine_bucket_size(start_time, end_time)
+
+        timeseries_data = get_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
+        return jsonify({'data': timeseries_data}), 200
+
+def parse_datetime(date_str):
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        return None
+    
+def determine_bucket_size(start_time, end_time):
+    if not start_time or not end_time:
+        return '1 day'  # Default bucket size if no dates are provided
+    
+    date_diff = (end_time - start_time).days
+    
+    if date_diff <= 1:
+        return '15 minutes'
+    elif date_diff <= 7:
+        return '1 hour'
+    elif date_diff <= 31:
+        return '4 hours'
+    else:
+        return '1 day'
