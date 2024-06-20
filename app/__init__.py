@@ -3,12 +3,17 @@ import os
 from config import Config
 from app.extensions import db, limiter, cors, login_manager, socketio
 from app.middleware import register_middlewares
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     app.secret_key = os.environ.get('FLASK_SECRET_KEY')
+
+    # Apply ProxyFix, this will allow unique users to be monitored
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
+
 
     # Initialise flask extensions
     # Initialise sqlalchemy db

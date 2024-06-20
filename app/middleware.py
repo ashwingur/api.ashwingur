@@ -1,3 +1,4 @@
+import sys
 from flask import request, Flask
 from datetime import datetime
 from app.models.request_log import RequestLog
@@ -10,6 +11,8 @@ def log_request():
 
         # Get the client IP address from the request headers
         user_ip = request.headers.get('X-Real-IP', request.remote_addr)
+
+        print(f"X-Real-IP: {request.headers.get('X-Real-IP')}", file=sys.stderr)
         
         endpoint = request.endpoint
         method = request.method
