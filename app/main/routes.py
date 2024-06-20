@@ -7,6 +7,8 @@ from app.models.user import User
 from app.extensions import roles_required
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from zoneinfo import ZoneInfo
+
 POSSIBLE_ROLES = ['user', 'admin']
 
 
@@ -85,7 +87,7 @@ def login():
     user = User.query.filter_by(username=username).first()
     if user and check_password_hash(user.password, password):
         login_user(user, remember=True)
-        user.last_login_timestamp = datetime.utcnow()
+        user.last_login_timestamp = datetime.now(ZoneInfo("UTC"))
         db.session.commit()
         return jsonify({'authenticated': True, 'username': user.username, 'role': user.role}), 200
 
