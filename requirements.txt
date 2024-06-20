@@ -9,3 +9,4 @@ redis
 gunicorn
 eventlet
 pillow
+werkzeug

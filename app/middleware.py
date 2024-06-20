@@ -7,7 +7,10 @@ from zoneinfo import ZoneInfo
 def log_request():
     if request.endpoint != 'static':
         timestamp = datetime.now(ZoneInfo("UTC"))
-        user_ip = request.remote_addr
+
+        # Get the client IP address from the request headers
+        user_ip = request.headers.get('X-Real-IP', request.remote_addr)
+        
         endpoint = request.endpoint
         method = request.method
 
