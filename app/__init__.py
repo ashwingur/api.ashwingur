@@ -3,7 +3,6 @@ import os
 from config import Config
 from app.extensions import db, limiter, cors, login_manager, socketio
 from app.middleware import register_middlewares
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 def create_app(config_class=Config):
@@ -17,8 +16,11 @@ def create_app(config_class=Config):
     db.init_app(app)
     with app.app_context():
         from app.models.user import create_admin_user
+        from app.models.request_log import RequestLog
+        from app.models.frontend_log import FrontendLog  # Ensure the model is imported
         # REMOVE THIS AFTER BECAUSE IT CAN WIPE THE WHOLE DB
         # User.__table__.drop(db.engine)
+        
         db.create_all()
         # Create admin user here if needed
     # Initialise sensor data table if it doesn't exist (this uses timescale db)
@@ -27,6 +29,8 @@ def create_app(config_class=Config):
     # Initialise analytics table if it doesnt exist
     from app.models.request_log import setup_request_logs_table
     setup_request_logs_table()
+    from app.models.frontend_log import setup_frontend_logs_table
+    setup_frontend_logs_table()
 
     # Initialise CORS for auth
     cors.init_app(app, resources={r"/*": {"origins": "*", "supports_credentials": True}})
