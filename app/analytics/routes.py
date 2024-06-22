@@ -36,7 +36,7 @@ def get_requests():
         bucket_size = determine_bucket_size(start_time, end_time)
 
         timeseries_data, unique_endpoints = get_api_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
-        return jsonify({'data': timeseries_data, 'unique_endpoints': unique_endpoints}), 200
+        return jsonify({'timeseries_data': timeseries_data, 'unique_endpoints': unique_endpoints}), 200
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])
 def get_frontend_visits():
@@ -64,8 +64,8 @@ def get_frontend_visits():
         # Determine the appropriate bucket size based on the date range
         bucket_size = determine_bucket_size(start_time, end_time)
 
-        timeseries_data = get_frontend_log_per_bucket(bucket_size, route, start_time, end_time)
-        return jsonify({'data': timeseries_data}), 200
+        timeseries_data, unique_routes = get_frontend_log_per_bucket(bucket_size, route, start_time, end_time)
+        return jsonify({'timeseries_data': timeseries_data, 'unique_routes': unique_routes}), 200
     elif request.method == 'POST':
         data = request.json
         if 'route' not in data:

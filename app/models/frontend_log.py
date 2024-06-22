@@ -38,10 +38,11 @@ def get_frontend_log_per_bucket(
         func.time_bucket(bucket_size, FrontendLog.timestamp).label('bucket'),
         func.count(FrontendLog.timestamp).label('total_count'),
         func.count(func.distinct(FrontendLog.user_id)).label('unique_user_id_count'),
-        func.count(func.distinct(FrontendLog.user_ip)).label('unique_user_ip_count')
+        func.count(func.distinct(FrontendLog.user_ip)).label('unique_user_ip_count'),
+        func.array_agg(func.distinct(FrontendLog.route)).label('routes')
     ).group_by('bucket').order_by('bucket')
 
-    # Add endpoint filter if specified
+    # Add route filter if specified
     if route:
         query = query.filter(FrontendLog.route.like(f"{route}%"))
     
@@ -61,11 +62,25 @@ def get_frontend_log_per_bucket(
             "total_visits": total_count,
             "unique_user_ids": unique_user_id_count,
             "unique_users_ips": unique_user_ip_count,
+            "unique_routes": routes,
         }
-        for bucket, total_count, unique_user_id_count, unique_user_ip_count in results
+        for bucket, total_count, unique_user_id_count, unique_user_ip_count, routes in results
     ]
+
+    # Query to get all unique routes within the time range
+    unique_routes_query = db.session.query(
+        func.distinct(FrontendLog.route)
+    )
+    if start_time:
+        unique_routes_query = unique_routes_query.filter(FrontendLog.timestamp >= start_time)
+    if end_time:
+        unique_routes_query = unique_routes_query.filter(FrontendLog.timestamp <= end_time)
+    if route:
+        unique_routes_query = unique_routes_query.filter(FrontendLog.route.like(f"{route}%"))
     
-    return data
+    unique_routes = [route[0] for route in unique_routes_query.all()]
+    
+    return data, unique_routes
 
 def insert_frontend_log(route: str):
     timestamp = datetime.now(ZoneInfo("UTC"))
