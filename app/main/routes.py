@@ -4,17 +4,21 @@ from app.main import bp
 from app.extensions import limiter, login_manager, db
 from flask_login import login_user, logout_user, login_required, current_user
 from app.models.user import User
-from app.extensions import roles_required
+from app.extensions import roles_required, get_real_ip
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from zoneinfo import ZoneInfo
 
 POSSIBLE_ROLES = ['user', 'admin']
 
-
 @bp.route('/')
 def index():
     return render_template('index.html')
+
+@bp.route('/ip')
+def ip():
+    ip = get_real_ip()
+    return f"<h1>Your IP: {ip}</h1>"
 
 @login_manager.user_loader
 def load_user(user_id):
