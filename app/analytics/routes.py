@@ -39,7 +39,7 @@ def get_requests():
         return jsonify({'timeseries_data': timeseries_data, 'unique_endpoints': unique_endpoints}), 200
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])
-def get_frontend_visits():
+def frontend_visits():
     if request.method == 'GET':
         params = request.args
         route = params.get('route', None)
