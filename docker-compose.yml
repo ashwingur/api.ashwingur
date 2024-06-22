@@ -1,5 +1,9 @@
 version: "3.8"
 
+networks:
+  app_network:
+    driver: bridge
+
 services:
   caddy:
     container_name: caddy
@@ -13,6 +17,8 @@ services:
       - caddy_config:/config
     depends_on:
       - flask_app
+    networks:
+      - app_network
 
   flask_app:
     container_name: flask_app
@@ -25,6 +31,8 @@ services:
     depends_on:
       - flask_db
       - flask_redis
+    networks:
+      - app_network
 
   flask_db:
     container_name: flask_db
@@ -35,10 +43,16 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # Expose port 5432 to the host
+    networks:
+      - app_network
 
   flask_redis:
     container_name: flask_redis
     image: redis:latest
+    networks:
+      - app_network
 
 volumes:
   pgdata: {}
