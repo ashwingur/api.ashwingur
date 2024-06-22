@@ -23,8 +23,6 @@ socketio = SocketIO()
 def get_real_ip():
     if request.headers.get('X-Forwarded-For'):
         # X-Forwarded-For can contain multiple IP addresses, we need the first one
-        print(f"X-remote is {request.remote_addr}", file=sys.stderr)
-        print(f"X-forwardedfor is {request.headers.get('X-Forwarded-For')}, xreal is {request.headers.get('X-Real-IP')}", file=sys.stderr)
         return request.headers.get('X-Forwarded-For').split(',')[0].strip()
     return request.remote_addr
 

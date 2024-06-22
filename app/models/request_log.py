@@ -8,6 +8,7 @@ class RequestLog(db.Model):
     __tablename__ = 'request_logs'
     timestamp = db.Column(db.TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), primary_key=True)
     user_id = db.Column(db.Text)
+    user_ip = db.Column(db.Text)
     endpoint = db.Column(db.Text)
     method = db.Column(db.Text)
 
@@ -37,7 +38,8 @@ def get_requests_per_bucket(
     query = db.session.query(
         func.time_bucket(bucket_size, RequestLog.timestamp).label('bucket'),
         func.count(RequestLog.timestamp).label('total_count'),
-        func.count(func.distinct(RequestLog.user_id)).label('unique_user_count')
+        func.count(func.distinct(RequestLog.user_id)).label('unique_user_id_count'),
+        func.count(func.distinct(RequestLog.user_ip)).label('')
     ).group_by('bucket').order_by('bucket')
 
     # Add endpoint filter if specified
@@ -58,9 +60,10 @@ def get_requests_per_bucket(
         {
             "timestamp": bucket.isoformat(),
             "total_requests": total_count,
-            "unique_users": unique_user_count
+            "unique_user_ids": unique_user_id_count,
+            "unique_users_ips": unique_user_ip_count,
         }
-        for bucket, total_count, unique_user_count in results
+        for bucket, total_count, unique_user_id_count, unique_user_ip_count in results
     ]
     
     return data

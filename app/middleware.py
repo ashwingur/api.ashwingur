@@ -3,11 +3,12 @@ import uuid
 from flask import g, make_response, request, Flask
 from datetime import datetime
 from app.models.request_log import RequestLog
-from app.extensions import db
+from app.extensions import db, get_real_ip
 from zoneinfo import ZoneInfo
 
 def set_user_id():
     user_id = request.cookies.get('user_id')
+    print(f'user id is ${user_id}', file=sys.stderr)
     if not user_id:
         user_id = str(uuid.uuid4())
         g.new_user_id = user_id  # Store in g to use later in the response
@@ -21,8 +22,9 @@ def log_request():
         user_id = g.user_id
         endpoint = request.endpoint
         method = request.method
+        user_ip = get_real_ip()
 
-        log_entry = RequestLog(user_id=user_id, endpoint=endpoint, method=method, timestamp=timestamp)
+        log_entry = RequestLog(user_id=user_id, user_ip=user_ip, endpoint=endpoint, method=method, timestamp=timestamp)
         db.session.add(log_entry)
         db.session.commit()
 
