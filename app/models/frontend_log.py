@@ -37,6 +37,7 @@ def get_frontend_log_per_bucket(
     query = db.session.query(
         func.time_bucket(bucket_size, FrontendLog.timestamp).label('bucket'),
         func.count(FrontendLog.timestamp).label('total_count'),
+        func.count(func.distinct(FrontendLog.user_id)).label('unique_user_id_count'),
         func.count(func.distinct(FrontendLog.user_ip)).label('unique_user_ip_count')
     ).group_by('bucket').order_by('bucket')
 
