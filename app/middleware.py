@@ -20,6 +20,8 @@ def log_request():
         timestamp = datetime.now(ZoneInfo("UTC"))
         user_id = g.user_id
         endpoint = request.endpoint
+        if endpoint is None:
+            endpoint = "null"
         method = request.method
         user_ip = get_real_ip()
 

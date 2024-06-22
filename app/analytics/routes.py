@@ -58,7 +58,7 @@ def get_frontend_visits():
         end_time = parse_datetime(end_time_str) if end_time_str else None
         
         if (start_time_str and start_time is None) or (end_time_str and end_time is None):
-            return jsonify({'error': 'Invalid datetime format. Use YYYY-MM-DDTHH:MM:SS'}), 400
+            return jsonify({'error': f'Invalid ISO 8601datetime format. Use YYYY-MM-DDTHH:MM:SS+HH:MM. start_time: {start_time}, end_time: {end_time}'}), 400
         
         # Determine the appropriate bucket size based on the date range
         bucket_size = determine_bucket_size(start_time, end_time)
@@ -75,10 +75,10 @@ def get_frontend_visits():
 
 
 
-def parse_datetime(date_str):
+def parse_datetime(date_str: str):
     try:
-        return datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S')
-    except ValueError:
+        return datetime.fromisoformat(date_str.replace(" ", "+"))
+    except ValueError as e:
         return None
     
 def determine_bucket_size(start_time, end_time):
