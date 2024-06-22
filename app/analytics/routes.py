@@ -2,7 +2,7 @@ import sys
 
 from flask import jsonify, request
 from app.analytics import bp
-from app.models.request_log import get_requests_per_bucket
+from app.models.request_log import get_api_requests_per_bucket
 from app.models.frontend_log import get_frontend_log_per_bucket, insert_frontend_log
 from datetime import datetime
 from app.extensions import limiter
@@ -34,7 +34,7 @@ def get_requests():
         # Determine the appropriate bucket size based on the date range
         bucket_size = determine_bucket_size(start_time, end_time)
 
-        timeseries_data = get_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
+        timeseries_data = get_api_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
         return jsonify({'data': timeseries_data}), 200
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])

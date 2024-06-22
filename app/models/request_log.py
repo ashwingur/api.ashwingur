@@ -28,7 +28,7 @@ def setup_request_logs_table():
     cur.close()
     conn.close()
 
-def get_requests_per_bucket(
+def get_api_requests_per_bucket(
     bucket_size: str = '1 hour', 
     endpoint: Optional[str] = None, 
     start_time: Optional[datetime] = None, 
@@ -39,7 +39,8 @@ def get_requests_per_bucket(
         func.time_bucket(bucket_size, RequestLog.timestamp).label('bucket'),
         func.count(RequestLog.timestamp).label('total_count'),
         func.count(func.distinct(RequestLog.user_id)).label('unique_user_id_count'),
-        func.count(func.distinct(RequestLog.user_ip)).label('unique_user_ip_count')
+        func.count(func.distinct(RequestLog.user_ip)).label('unique_user_ip_count'),
+        func.array_agg(func.distinct(RequestLog.endpoint)).label('endpoints')
     ).group_by('bucket').order_by('bucket')
 
     # Add endpoint filter if specified
@@ -62,8 +63,9 @@ def get_requests_per_bucket(
             "total_requests": total_count,
             "unique_user_ids": unique_user_id_count,
             "unique_users_ips": unique_user_ip_count,
+            "endpoints": endpoints
         }
-        for bucket, total_count, unique_user_id_count, unique_user_ip_count in results
+        for bucket, total_count, unique_user_id_count, unique_user_ip_count, endpoints in results
     ]
     
     return data

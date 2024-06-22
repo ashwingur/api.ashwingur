@@ -17,8 +17,6 @@ def create_app(config_class=Config):
         from app.models.user import create_admin_user
         from app.models.request_log import RequestLog
         from app.models.frontend_log import FrontendLog  # Ensure the model is imported
-        # REMOVE THIS AFTER BECAUSE IT CAN WIPE THE WHOLE DB
-        # User.__table__.drop(db.engine)
         
         db.create_all()
         # Create admin user here if needed
