@@ -6,6 +6,15 @@ from app.models.request_log import RequestLog
 from app.extensions import db
 from zoneinfo import ZoneInfo
 
+def set_user_id():
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        user_id = str(uuid.uuid4())
+        g.new_user_id = user_id  # Store in g to use later in the response
+    else:
+        g.new_user_id = None
+    g.user_id = user_id
+
 def log_request():
     if request.endpoint != 'static':
         timestamp = datetime.now(ZoneInfo("UTC"))
@@ -17,21 +26,12 @@ def log_request():
         db.session.add(log_entry)
         db.session.commit()
 
-        # If a new user_id was set, update the response to include the cookie
-        if g.new_user_id:
-            response = make_response()
-            response.set_cookie('user_id', g.new_user_id)
-            return response
-
-def set_user_cookie():
-    user_id = request.cookies.get('user_id')
-    if not user_id:
-        user_id = str(uuid.uuid4())
-        g.new_user_id = user_id  # Store in g to use later in the response
-    else:
-        g.new_user_id = None
-    g.user_id = user_id
+def set_user_cookie(response):
+    if g.get('new_user_id'):
+        response.set_cookie('user_id', g.new_user_id)
+    return response
 
 def register_middlewares(app: Flask):
-    app.before_request(set_user_cookie)
+    app.before_request(set_user_id)
     app.before_request(log_request)
+    app.after_request(set_user_cookie)

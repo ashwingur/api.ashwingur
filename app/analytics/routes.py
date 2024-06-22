@@ -8,7 +8,7 @@ from datetime import datetime
 from app.extensions import limiter
 
 @bp.route('/requests', methods=['GET'])
-@limiter.limit('10/minute', override_defaults=True)
+# @limiter.limit('10/minute', override_defaults=True)
 def get_requests():
     if request.method == 'GET':
         params = request.args
