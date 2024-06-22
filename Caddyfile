@@ -26,8 +26,9 @@
 # https://caddyserver.com/docs/caddyfile
 
 localhost {
-    reverse_proxy flask_app:5000 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+    reverse_proxy flask_app:5000
+}
+
+api.ashwingur.com {
+    reverse_proxy flask_app:5000
 }
