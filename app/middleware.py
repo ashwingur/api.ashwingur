@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 
 def set_user_id():
     user_id = request.cookies.get('user_id')
-    print(f'user id is ${user_id}', file=sys.stderr)
     if not user_id:
         user_id = str(uuid.uuid4())
         g.new_user_id = user_id  # Store in g to use later in the response

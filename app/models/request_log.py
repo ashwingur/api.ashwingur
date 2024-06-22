@@ -39,7 +39,7 @@ def get_requests_per_bucket(
         func.time_bucket(bucket_size, RequestLog.timestamp).label('bucket'),
         func.count(RequestLog.timestamp).label('total_count'),
         func.count(func.distinct(RequestLog.user_id)).label('unique_user_id_count'),
-        func.count(func.distinct(RequestLog.user_ip)).label('')
+        func.count(func.distinct(RequestLog.user_ip)).label('unique_user_ip_count')
     ).group_by('bucket').order_by('bucket')
 
     # Add endpoint filter if specified
