@@ -5,8 +5,10 @@ from app.analytics import bp
 from app.models.request_log import get_requests_per_bucket
 from app.models.frontend_log import get_frontend_log_per_bucket, insert_frontend_log
 from datetime import datetime
+from app.extensions import limiter
 
 @bp.route('/requests', methods=['GET'])
+@limiter.limit('10/minute', override_defaults=True)
 def get_requests():
     if request.method == 'GET':
         params = request.args

@@ -9,6 +9,7 @@ from flask_login import LoginManager, current_user
 from config import Config
 from flask_socketio import SocketIO, emit
 from redis import Redis
+import sys
 
 db = SQLAlchemy()
 
@@ -18,8 +19,18 @@ login_manager = LoginManager()
 
 socketio = SocketIO()
 
+# Custom function to get the real IP address
+def get_real_ip():
+    if request.headers.get('X-Forwarded-For'):
+        # X-Forwarded-For can contain multiple IP addresses, we need the first one
+        print(f"X-forwardedfor is {request.headers.get('X-Forwarded-For')}", file=sys.stderr)
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    print(f"X-remote is {request.remote_addr}", file=sys.stderr)
+    return request.remote_addr
+
 limiter = Limiter(
-    get_remote_address,
+    # get_remote_address,
+    get_real_ip,
     default_limits=["50 per hour"],
     storage_uri=Config.REDIS_URL
 )
@@ -27,6 +38,7 @@ limiter = Limiter(
 
 def psycop_conn():
     return psycopg2.connect(Config.SQLALCHEMY_DATABASE_URI)
+
 
 # Role required decorator
 def roles_required(*roles):
