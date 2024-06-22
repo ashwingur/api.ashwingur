@@ -6,6 +6,7 @@ from app.models.request_log import get_api_requests_per_bucket
 from app.models.frontend_log import get_frontend_log_per_bucket, insert_frontend_log
 from datetime import datetime
 from app.extensions import limiter
+from zoneinfo import ZoneInfo
 
 @bp.route('/requests', methods=['GET'])
 # @limiter.limit('10/minute', override_defaults=True)
@@ -77,8 +78,15 @@ def get_frontend_visits():
 
 def parse_datetime(date_str: str):
     try:
-        return datetime.fromisoformat(date_str.replace(" ", "+"))
-    except ValueError as e:
+        # Replace space with plus to handle potential URL encoding issues
+        date_str = date_str.replace(" ", "+")
+        # Parse the datetime string
+        dt = datetime.fromisoformat(date_str)
+        # If the datetime object is not timezone-aware, set it to UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        return dt
+    except ValueError:
         return None
     
 def determine_bucket_size(start_time, end_time):
