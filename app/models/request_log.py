@@ -57,18 +57,31 @@ def get_api_requests_per_bucket(
     results = query.all()
     
     # Format the results into a list of dictionaries
-    data = [
+    time_data = [
         {
             "timestamp": bucket.isoformat(),
             "total_requests": total_count,
             "unique_user_ids": unique_user_id_count,
             "unique_users_ips": unique_user_ip_count,
-            "endpoints": endpoints
+            "unique_endpoints": endpoints
         }
         for bucket, total_count, unique_user_id_count, unique_user_ip_count, endpoints in results
     ]
+
+    # Query to get all unique endpoints within the time range
+    unique_endpoints_query = db.session.query(
+        func.distinct(RequestLog.endpoint)
+    )
+    if start_time:
+        unique_endpoints_query = unique_endpoints_query.filter(RequestLog.timestamp >= start_time)
+    if end_time:
+        unique_endpoints_query = unique_endpoints_query.filter(RequestLog.timestamp <= end_time)
+    if endpoint:
+        unique_endpoints_query = unique_endpoints_query.filter(RequestLog.endpoint.like(f"{endpoint}%"))
     
-    return data
+    unique_endpoints = [endpoint[0] for endpoint in unique_endpoints_query.all()]
+    
+    return time_data, unique_endpoints
 
 
 
