@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from dateutil import parser
 
 @bp.route('/requests', methods=['GET'])
-# @limiter.limit('10/minute', override_defaults=True)
+@limiter.limit('20/minute', override_defaults=True)
 def get_requests():
     if request.method == 'GET':
         params = request.args
@@ -40,6 +40,7 @@ def get_requests():
         return jsonify({'timeseries_data': timeseries_data, 'unique_endpoints': unique_endpoints}), 200
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])
+@limiter.limit('20/minute', override_defaults=True)
 def frontend_visits():
     if request.method == 'GET':
         params = request.args
