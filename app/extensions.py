@@ -29,7 +29,7 @@ def get_real_ip():
 limiter = Limiter(
     # get_remote_address,
     get_real_ip,
-    default_limits=["50 per hour"],
+    default_limits=["100 per hour"],
     storage_uri=Config.REDIS_URL
 )
 
