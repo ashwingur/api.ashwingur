@@ -1,4 +1,5 @@
 from datetime import datetime
+import sys
 from typing import Dict, List, Optional
 from flask import g
 from app.extensions import db, psycop_conn, get_real_ip
@@ -44,7 +45,11 @@ def get_frontend_log_per_bucket(
 
     # Add route filter if specified
     if route:
-        query = query.filter(FrontendLog.route.like(f"{route}%"))
+        if route == '/':
+            # Special case for the home route we only want that because by default we get all routes anyway
+            query = query.filter(FrontendLog.route == route)
+        else:
+            query = query.filter(FrontendLog.route.like(f"{route}%"))
     
     # Add time range filter if specified
     if start_time:
@@ -76,7 +81,11 @@ def get_frontend_log_per_bucket(
     if end_time:
         unique_routes_query = unique_routes_query.filter(FrontendLog.timestamp <= end_time)
     if route:
-        unique_routes_query = unique_routes_query.filter(FrontendLog.route.like(f"{route}%"))
+        if route == '/':
+            # Special case for the home route we only want that because by default we get all routes anyway
+            unique_routes_query = unique_routes_query.filter(FrontendLog.route == route)
+        else:
+            unique_routes_query = unique_routes_query.filter(FrontendLog.route.like(f"{route}%"))
     
     unique_routes = [route[0] for route in unique_routes_query.all()]
     
