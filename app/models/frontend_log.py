@@ -82,7 +82,7 @@ def get_frontend_log_per_bucket(
             "timestamp": row.bucket.isoformat(),
             "total_visits": row.total_count,
             "unique_user_ids": row.unique_user_id_count,
-            "unique_users_ips": row.unique_user_ip_count,
+            "unique_user_ips": row.unique_user_ip_count,
             "unique_routes": row.routes,
         }
         for row in rows

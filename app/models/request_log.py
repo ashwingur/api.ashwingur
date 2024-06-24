@@ -78,7 +78,7 @@ def get_api_requests_per_bucket(
             "timestamp": row.bucket.isoformat(),
             "total_requests": row.total_count,
             "unique_user_ids": row.unique_user_id_count,
-            "unique_users_ips": row.unique_user_ip_count,
+            "unique_user_ips": row.unique_user_ip_count,
             "unique_endpoints": row.endpoints
         }
         for row in rows
