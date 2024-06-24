@@ -5,7 +5,6 @@ import requests
 from app.analytics import bp
 from app.models.request_log import get_api_requests_per_bucket
 from app.models.frontend_log import get_frontend_log_per_bucket, insert_frontend_log
-from datetime import datetime
 from app.extensions import limiter
 from zoneinfo import ZoneInfo
 from dateutil import parser
@@ -37,8 +36,8 @@ def get_requests():
         # Determine the appropriate bucket size based on the date range
         bucket_size = determine_bucket_size(start_time, end_time)
 
-        timeseries_data, unique_endpoints = get_api_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
-        return jsonify({'timeseries_data': timeseries_data, 'unique_endpoints': unique_endpoints}), 200
+        result = get_api_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
+        return jsonify(result), 200
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])
 @limiter.limit('20/minute', override_defaults=True)

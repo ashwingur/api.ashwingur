@@ -107,6 +107,7 @@ def get_frontend_log_per_bucket(
     
     # Query to get total unique user ids and ips for the entire period
     total_unique_query = db.session.query(
+        func.count().label('total_count'),
         func.count(func.distinct(FrontendLog.user_id)).label('total_unique_user_id_count'),
         func.count(func.distinct(FrontendLog.user_ip)).label('total_unique_user_ip_count')
     )
@@ -121,6 +122,7 @@ def get_frontend_log_per_bucket(
             total_unique_query = total_unique_query.filter(FrontendLog.route.like(f"{route}%"))
 
     total_unique_result = total_unique_query.one()
+    total_count = total_unique_result.total_count
     total_unique_user_id_count = total_unique_result.total_unique_user_id_count
     total_unique_user_ip_count = total_unique_result.total_unique_user_ip_count
 
@@ -128,6 +130,7 @@ def get_frontend_log_per_bucket(
     return {
         "timeseries_data": data,
         "unique_routes": unique_routes,
+        "total_count": total_count,
         "total_unique_user_id_count": total_unique_user_id_count,
         "total_unique_user_ip_count": total_unique_user_ip_count
     }
