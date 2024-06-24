@@ -11,3 +11,4 @@ eventlet
 pillow
 werkzeug
 python-dateutil
+requests

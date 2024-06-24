@@ -1,6 +1,7 @@
 import sys
 
 from flask import jsonify, request
+import requests
 from app.analytics import bp
 from app.models.request_log import get_api_requests_per_bucket
 from app.models.frontend_log import get_frontend_log_per_bucket, insert_frontend_log
@@ -73,10 +74,31 @@ def frontend_visits():
         if 'route' not in data:
             return jsonify({"success": False, 'error': 'route not provided'}), 400
         
-        insert_frontend_log(data['route'])
+        # Check if the route is valid for security purposes (so we dont get any bad words in a nonexistent route)
+        route = data['route']
+        if not check_url_validity(f'https://www.ashwingur.com/{route}'):
+            return jsonify({"success": False, 'error': 'Invalid or blocked route'}), 400
+        
+        insert_frontend_log(sanitise_route(route))
         return jsonify({'success': True}), 201
 
+def sanitise_route(route: str) -> str:
+    if '/ClashOfClans/player/' in route:
+        return '/ClashOfClans/player'
+    elif '/ClashOfClans/clan/' in route:
+        return '/ClashOfClans/clan'
+    return route
 
+def check_url_validity(url: str) -> bool:
+    try:
+        response = requests.get(url)
+        # Check if the status code is valid
+        if 200 <= response.status_code < 300:
+            return True
+        else:
+            return False
+    except requests.exceptions.RequestException as e:
+        return False
 
 def parse_datetime(date_str: str):
     try:
