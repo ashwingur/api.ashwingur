@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from flask import g
 from app.extensions import db, psycop_conn, get_real_ip
 from zoneinfo import ZoneInfo
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 class FrontendLog(db.Model):
     __tablename__ = 'frontend_logs'
@@ -34,42 +34,58 @@ def get_frontend_log_per_bucket(
     start_time: Optional[datetime] = None, 
     end_time: Optional[datetime] = None
 ) -> List[Dict[str, any]]:
-    # Construct the base query with time_bucket
-    query = db.session.query(
-        func.time_bucket(bucket_size, FrontendLog.timestamp).label('bucket'),
-        func.count(FrontendLog.timestamp).label('total_count'),
-        func.count(func.distinct(FrontendLog.user_id)).label('unique_user_id_count'),
-        func.count(func.distinct(FrontendLog.user_ip)).label('unique_user_ip_count'),
-        func.array_agg(func.distinct(FrontendLog.route)).label('routes')
-    ).group_by('bucket').order_by('bucket')
-
-    # Add route filter if specified
+    # Construct the base query with time_bucket_gapfill
+    # Using a custom query because sqlalchemy doesnt support time_bucket_gapfill
+    base_query = """
+        SELECT 
+            time_bucket_gapfill(:bucket_size, timestamp) AS bucket,
+            COALESCE(count(timestamp), 0) AS total_count,
+            COALESCE(count(DISTINCT user_id), 0) AS unique_user_id_count,
+            COALESCE(count(DISTINCT user_ip), 0) AS unique_user_ip_count,
+            COALESCE(array_agg(DISTINCT route), ARRAY[]::varchar[]) AS routes
+        FROM frontend_logs
+        WHERE (:start_time IS NULL OR timestamp >= :start_time)
+          AND (:end_time IS NULL OR timestamp <= :end_time)
+          {route_filter}
+        GROUP BY bucket
+        ORDER BY bucket;
+    """
+    
+    # Construct the route filter if needed
+    route_filter = ""
     if route:
         if route == '/':
-            # Special case for the home route we only want that because by default we get all routes anyway
-            query = query.filter(FrontendLog.route == route)
+            route_filter = "AND route = '/'"
         else:
-            query = query.filter(FrontendLog.route.like(f"{route}%"))
-    
-    # Add time range filter if specified
-    if start_time:
-        query = query.filter(FrontendLog.timestamp >= start_time)
-    if end_time:
-        query = query.filter(FrontendLog.timestamp <= end_time)
-    
-    # Execute the query and fetch all results
-    results = query.all()
+            route_filter = "AND route LIKE :route"
+
+    # Add the route filter to the base query
+    base_query = base_query.format(route_filter=route_filter)
+
+    # Execute the raw SQL with parameters
+    result = db.session.execute(
+        text(base_query), 
+        {
+            'bucket_size': bucket_size, 
+            'start_time': start_time, 
+            'end_time': end_time, 
+            'route': f"{route}%" if route and route != '/' else route
+        }
+    )
+
+    # Fetch all results
+    rows = result.fetchall()
     
     # Format the results into a list of dictionaries
     data = [
         {
-            "timestamp": bucket.isoformat(),
-            "total_visits": total_count,
-            "unique_user_ids": unique_user_id_count,
-            "unique_users_ips": unique_user_ip_count,
-            "unique_routes": routes,
+            "timestamp": row.bucket.isoformat(),
+            "total_visits": row.total_count,
+            "unique_user_ids": row.unique_user_id_count,
+            "unique_users_ips": row.unique_user_ip_count,
+            "unique_routes": row.routes,
         }
-        for bucket, total_count, unique_user_id_count, unique_user_ip_count, routes in results
+        for row in rows
     ]
 
     # Query to get all unique routes within the time range
@@ -89,7 +105,32 @@ def get_frontend_log_per_bucket(
     
     unique_routes = [route[0] for route in unique_routes_query.all()]
     
-    return data, unique_routes
+    # Query to get total unique user ids and ips for the entire period
+    total_unique_query = db.session.query(
+        func.count(func.distinct(FrontendLog.user_id)).label('total_unique_user_id_count'),
+        func.count(func.distinct(FrontendLog.user_ip)).label('total_unique_user_ip_count')
+    )
+    if start_time:
+        total_unique_query = total_unique_query.filter(FrontendLog.timestamp >= start_time)
+    if end_time:
+        total_unique_query = total_unique_query.filter(FrontendLog.timestamp <= end_time)
+    if route:
+        if route == '/':
+            total_unique_query = total_unique_query.filter(FrontendLog.route == route)
+        else:
+            total_unique_query = total_unique_query.filter(FrontendLog.route.like(f"{route}%"))
+
+    total_unique_result = total_unique_query.one()
+    total_unique_user_id_count = total_unique_result.total_unique_user_id_count
+    total_unique_user_ip_count = total_unique_result.total_unique_user_ip_count
+
+    # Return the data with the additional total unique counts
+    return {
+        "timeseries_data": data,
+        "unique_routes": unique_routes,
+        "total_unique_user_id_count": total_unique_user_id_count,
+        "total_unique_user_ip_count": total_unique_user_ip_count
+    }
 
 def insert_frontend_log(route: str):
     timestamp = datetime.now(ZoneInfo("UTC"))
