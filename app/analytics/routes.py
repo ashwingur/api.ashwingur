@@ -77,7 +77,7 @@ def frontend_visits():
         # Check if the route is valid for security purposes (so we dont get any bad words in a nonexistent route)
         route = data['route']
         if not check_url_validity(f'https://www.ashwingur.com/{route}'):
-            return jsonify({"success": False, 'error': 'Invalid or blocked route'}), 400
+            route = "404"
         
         insert_frontend_log(sanitise_route(route))
         return jsonify({'success': True}), 201
