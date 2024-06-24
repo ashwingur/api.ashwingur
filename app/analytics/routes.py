@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys
 
 from flask import jsonify, request
@@ -113,11 +114,17 @@ def parse_datetime(date_str: str):
     except ValueError:
         return None
     
-def determine_bucket_size(start_time, end_time):
+def determine_bucket_size(start_time: datetime, end_time: datetime):
     if not start_time or not end_time:
         return '1 day'  # Default bucket size if no dates are provided
     
     date_diff = (end_time - start_time).days
+    seconds_difference = (end_time - start_time).total_seconds()
+
+    if seconds_difference <= 7200:
+        return '1 minute'
+    elif seconds_difference <= 43200:
+        return '5 minutes'
     
     if date_diff <= 1:
         return '15 minutes'
