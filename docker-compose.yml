@@ -42,7 +42,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432" # Expose port 5432 to the host
+      - "5432:5432"
     networks:
       - app_network
 

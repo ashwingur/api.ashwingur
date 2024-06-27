@@ -4,6 +4,12 @@ from config import Config
 from app.extensions import db, limiter, cors, login_manager, socketio
 from app.middleware import register_middlewares
 
+# Import DB models
+from app.models.user import create_admin_user
+from app.models.request_log import RequestLog
+from app.models.frontend_log import FrontendLog  # Ensure the model is imported so its registered
+from app.models.media_reviews import MediaReviewGenre, MediaReview, Genre,  initialise_media_reviews, create_example_reviews_and_genres
+
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -16,11 +22,11 @@ def create_app(config_class=Config):
     # Initialise sqlalchemy db
     db.init_app(app)
     with app.app_context():
-        from app.models.user import create_admin_user
-        from app.models.request_log import RequestLog
-        from app.models.frontend_log import FrontendLog  # Ensure the model is imported
+        initialise_media_reviews()
         
         db.create_all()
+
+        create_example_reviews_and_genres()
         # Create admin user here if needed
     # Initialise sensor data table if it doesn't exist (this uses timescale db)
     from app.models.weather_data import setup_sensor_data_table
@@ -61,5 +67,8 @@ def create_app(config_class=Config):
 
     from app.analytics import bp as analytics_bp
     app.register_blueprint(analytics_bp, url_prefix='/analytics')
+
+    from app.mediareviews import bp as mediareviews_bp
+    app.register_blueprint(mediareviews_bp, url_prefix='/mediareviews')
     
     return app
