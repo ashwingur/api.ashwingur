@@ -1,7 +1,7 @@
 from datetime import datetime
 import sys
 
-from sqlalchemy import ARRAY, inspect, text
+from sqlalchemy import ARRAY, Boolean, TIMESTAMP, inspect, text
 from zoneinfo import ZoneInfo
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
@@ -22,11 +22,9 @@ class MediaReviewGenre(db.Model):
 def initialise_media_reviews():
     with db.engine.connect() as connection:
         if not inspect(connection).has_schema(SCHEMA):
-            print("Creating schema...", file=sys.stderr)
+            print(f"Creating schema: {SCHEMA}", file=sys.stderr)
             connection.execute(CreateSchema(SCHEMA))
             connection.commit()
-        else:
-            print("SCHEMA EXISTS...", file=sys.stderr)
 
 
 class MediaReview(db.Model):
@@ -36,18 +34,19 @@ class MediaReview(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     media_type = db.Column(db.String, nullable=False)
-    review_creation_date = db.Column(db.TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
-    review_last_update_date = db.Column(db.TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
+    review_creation_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
+    review_last_update_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
     cover_image = db.Column(db.String)
     rating = db.Column(db.Float)
     review_content = db.Column(db.Text)
     word_count = db.Column(db.Integer)
     run_time = db.Column(db.Integer)
     creator = db.Column(db.String)
-    creation_date = db.Column(db.TIMESTAMP(timezone=True))
-    date_consumed = db.Column(db.TIMESTAMP(timezone=True))
+    media_creation_date = db.Column(TIMESTAMP(timezone=True))
+    date_consumed = db.Column(TIMESTAMP(timezone=True))
     pros = db.Column(ARRAY(db.String))
     cons = db.Column(ARRAY(db.String))
+    visible = db.Column(Boolean, default=True)
 
     # Define relationship to Genre
     genres = db.relationship('Genre', secondary=f'{SCHEMA}.media_review_genre', back_populates='media_reviews')
@@ -81,11 +80,12 @@ def get_all_media_reviews_with_genres():
             'word_count': review.word_count,
             'run_time': review.run_time,
             'creator': review.creator,
-            'creation_date': review.creation_date.isoformat() if review.creation_date else None,
+            'media_creation_date': review.media_creation_date.isoformat() if review.media_creation_date else None,
             'date_consumed': review.date_consumed.isoformat() if review.date_consumed else None,
             'pros': review.pros,
             'cons': review.cons,
-            'genres': [genre.name for genre in review.genres]
+            'genres': [genre.name for genre in review.genres],
+            'visible': review.visible
         }
         result.append(review_data)
 
@@ -118,7 +118,7 @@ def create_example_reviews_and_genres():
             word_count=200,
             run_time=120,
             creator='Reviewer 1',
-            creation_date=datetime(2023, 1, 1),
+            media_creation_date=datetime(2023, 1, 1),
             date_consumed=datetime(2023, 1, 2),
             pros=['Great action scenes.'],
             cons=['Predictable plot.'],
@@ -136,7 +136,7 @@ def create_example_reviews_and_genres():
             word_count=300,
             run_time=30,
             creator='Reviewer 2',
-            creation_date=datetime(2023, 2, 1),
+            media_creation_date=datetime(2023, 2, 1),
             date_consumed=datetime(2023, 2, 2),
             pros=['Hilarious dialogues.'],
             cons=['Some episodes are slow.'],
@@ -154,7 +154,7 @@ def create_example_reviews_and_genres():
             word_count=500,
             run_time=None,
             creator='Reviewer 3',
-            creation_date=datetime(2023, 3, 1),
+            media_creation_date=datetime(2023, 3, 1),
             date_consumed=datetime(2023, 3, 2),
             pros=['Keeps you on the edge of your seat.'],
             cons=['Somewhat predictable ending.'],
@@ -172,7 +172,7 @@ def create_example_reviews_and_genres():
             word_count=250,
             run_time=150,
             creator='Reviewer 4',
-            creation_date=datetime(2023, 4, 1),
+            media_creation_date=datetime(2023, 4, 1),
             date_consumed=datetime(2023, 4, 2),
             pros=['Great special effects.'],
             cons=['A bit too long.'],
@@ -190,7 +190,7 @@ def create_example_reviews_and_genres():
             word_count=350,
             run_time=45,
             creator='Reviewer 5',
-            creation_date=datetime(2023, 5, 1),
+            media_creation_date=datetime(2023, 5, 1),
             date_consumed=datetime(2023, 5, 2),
             pros=['Great chemistry between leads.'],
             cons=['Some clichés.'],
@@ -208,7 +208,7 @@ def create_example_reviews_and_genres():
             word_count=300,
             run_time=90,
             creator='Reviewer 6',
-            creation_date=datetime(2023, 6, 1),
+            media_creation_date=datetime(2023, 6, 1),
             date_consumed=datetime(2023, 6, 2),
             pros=['Very informative.'],
             cons=['Could have included more interviews.'],
