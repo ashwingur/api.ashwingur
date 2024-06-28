@@ -3,10 +3,9 @@ import sys
 from flask_login import login_required
 from app.mediareviews import bp
 from flask import jsonify, request
-from app.models.media_reviews import MediaReview, get_all_media_reviews_with_genres, create_new_media_review, update_media_review
+from app.models.media_reviews import MediaReview, get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
-
 from zoneinfo import ZoneInfo
 
 # Validate the field values, excluding ID
@@ -60,9 +59,9 @@ def get_review():
     
 
 @bp.route('', methods=['POST'])
+@limiter.limit('10/minute', override_defaults=True)
 @login_required
 @roles_required('admin')
-@limiter.limit('10/minute', override_defaults=True)
 def post_review():
     data = request.json
 
@@ -112,9 +111,9 @@ def post_review():
     return response
 
 @bp.route('/<int:review_id>', methods=['PUT'])
+@limiter.limit('10/minute', override_defaults=True)
 @login_required
 @roles_required('admin')
-@limiter.limit('10/minute', override_defaults=True)
 def update_review(review_id):
     data = request.json
 
@@ -144,12 +143,25 @@ def update_review(review_id):
     media_review.visible = data.get('visible', media_review.visible)
     media_review.review_last_update_date = datetime.now(tz=ZoneInfo("UTC"))
 
-    # Handle genres
     new_genres = data.get('genres', [])
 
     response = update_media_review(media_review, new_genres)
 
     return response
+
+@bp.route('/<int:review_id>', methods=['DELETE'])
+@limiter.limit('3/minute; 20/hour', override_defaults=True)
+@login_required
+@roles_required('admin')
+def delete_review(review_id):
+    # Retrieve the media review by ID
+    media_review = MediaReview.query.get(review_id)
+    if not media_review:
+        return jsonify({"error": "Media review not found"}), 404
+
+    response = delete_media_review(media_review)
+    return response
+
 
 def is_valid_list_of_non_empty_strings(obj):
     if not isinstance(obj, list):

@@ -153,6 +153,24 @@ def update_media_review(media_review: MediaReview, genres: List[str]):
         db.session.rollback()
         return jsonify({"error": "An error occurred while updating the media review"}), 500
 
+def delete_media_review(media_review: MediaReview):
+    # Delete the media review
+    db.session.delete(media_review)
+
+    # Commit the changes to delete the media review
+    db.session.commit()
+
+    # Delete orphaned genres
+    all_genres = Genre.query.all()
+    for genre in all_genres:
+        if not genre.media_reviews:
+            db.session.delete(genre)
+
+    # Commit the changes to delete orphaned genres
+    db.session.commit()
+
+    return jsonify({"message": "Media review deleted successfully"}), 200
+
 
 # Utility function
 def create_example_reviews_and_genres():
