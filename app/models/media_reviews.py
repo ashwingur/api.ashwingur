@@ -1,6 +1,6 @@
 from datetime import datetime
 import sys
-from typing import List
+from typing import Dict, List
 
 from flask import Response, jsonify
 from sqlalchemy import ARRAY, Boolean, TIMESTAMP, inspect, text
@@ -45,7 +45,7 @@ class MediaReview(db.Model):
     run_time = db.Column(db.Integer)
     creator = db.Column(db.String)
     media_creation_date = db.Column(TIMESTAMP(timezone=True))
-    date_consumed = db.Column(TIMESTAMP(timezone=True))
+    consumed_date = db.Column(TIMESTAMP(timezone=True))
     pros = db.Column(ARRAY(db.String))
     cons = db.Column(ARRAY(db.String))
     visible = db.Column(Boolean, default=True)
@@ -64,38 +64,45 @@ class Genre(db.Model):
     # Define relationship to MediaReview
     media_reviews = db.relationship('MediaReview', secondary=f'{SCHEMA}.media_review_genre', back_populates='genres')
 
+def media_review_to_response_item(review: MediaReview) -> Dict[str, any]:
+    return {
+        'id': review.id,
+        'name': review.name,
+        'media_type': review.media_type,
+        'review_creation_date': review.review_creation_date.isoformat() if review.review_creation_date else None,
+        'review_last_update_date': review.review_last_update_date.isoformat() if review.review_last_update_date else None,
+        'cover_image': review.cover_image,
+        'rating': review.rating,
+        'review_content': review.review_content,
+        'word_count': review.word_count,
+        'run_time': review.run_time,
+        'creator': review.creator,
+        'media_creation_date': review.media_creation_date.isoformat() if review.media_creation_date else None,
+        'consumed_date': review.consumed_date.isoformat() if review.consumed_date else None,
+        'pros': review.pros,
+        'cons': review.cons,
+        'genres': [genre.name for genre in review.genres],
+        'visible': review.visible
+    }
 
 def get_all_media_reviews_with_genres():
     reviews = db.session.query(MediaReview).options(joinedload(MediaReview.genres)).all()
     result = []
 
     for review in reviews:
-        review_data = {
-            'id': review.id,
-            'name': review.name,
-            'media_type': review.media_type,
-            'review_creation_date': review.review_creation_date.isoformat() if review.review_creation_date else None,
-            'review_last_update_date': review.review_last_update_date.isoformat() if review.review_last_update_date else None,
-            'cover_image': review.cover_image,
-            'rating': review.rating,
-            'review_content': review.review_content,
-            'word_count': review.word_count,
-            'run_time': review.run_time,
-            'creator': review.creator,
-            'media_creation_date': review.media_creation_date.isoformat() if review.media_creation_date else None,
-            'date_consumed': review.date_consumed.isoformat() if review.date_consumed else None,
-            'pros': review.pros,
-            'cons': review.cons,
-            'genres': [genre.name for genre in review.genres],
-            'visible': review.visible
-        }
-        result.append(review_data)
+        result.append(media_review_to_response_item(review))
 
     return result
 
 
-def create_new_media_review(media_review: MediaReview, genres: List[str]) -> Response:
+def create_new_media_review(media_review: MediaReview, genres: List[str]):
     try:
+        # Check if a media review with the same name and media_type already exists
+        existing_review = MediaReview.query.filter_by(name=media_review.name, media_type=media_review.media_type).first()
+        if existing_review:
+            return jsonify({"error": f"A media review with the name '{existing_review.name}' and media_type '{existing_review.media_type}' already exists (id: {existing_review.id})"}), 409
+
+
         db.session.add(media_review)
         db.session.commit()
 
@@ -111,11 +118,40 @@ def create_new_media_review(media_review: MediaReview, genres: List[str]) -> Res
 
         db.session.commit()
 
-        return jsonify({ 'id': media_review.id}), 201
+        return jsonify(media_review_to_response_item(media_review)), 201
 
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "An error occurred while creating the media review"}), 500
+
+def update_media_review(media_review: MediaReview, genres: List[str]):
+    try:
+        # Handle genres
+        if genres:
+            new_genre_objs = []
+            for genre_name in genres:
+                genre = Genre.query.filter_by(name=genre_name).first()
+                if not genre:
+                    genre = Genre(name=genre_name)
+                    db.session.add(genre)
+                new_genre_objs.append(genre)
+            
+            # Update the media review's genres
+            media_review.genres = new_genre_objs
+
+            # Delete orphaned genres
+            all_genres = Genre.query.all()
+            for genre in all_genres:
+                if not genre.media_reviews:
+                    db.session.delete(genre)
+
+        # Commit the changes
+        db.session.commit()
+
+        return jsonify({"message": "Media review updated successfully"}), 200
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred while updating the media review"}), 500
 
 
 # Utility function
@@ -145,7 +181,7 @@ def create_example_reviews_and_genres():
             run_time=120,
             creator='Reviewer 1',
             media_creation_date=datetime(2023, 1, 1),
-            date_consumed=datetime(2023, 1, 2),
+            consumed_date=datetime(2023, 1, 2),
             pros=['Great action scenes.'],
             cons=['Predictable plot.'],
             genres=[genre1, genre2]
@@ -163,7 +199,7 @@ def create_example_reviews_and_genres():
             run_time=30,
             creator='Reviewer 2',
             media_creation_date=datetime(2023, 2, 1),
-            date_consumed=datetime(2023, 2, 2),
+            consumed_date=datetime(2023, 2, 2),
             pros=['Hilarious dialogues.'],
             cons=['Some episodes are slow.'],
             genres=[genre2, genre3]
@@ -181,7 +217,7 @@ def create_example_reviews_and_genres():
             run_time=None,
             creator='Reviewer 3',
             media_creation_date=datetime(2023, 3, 1),
-            date_consumed=datetime(2023, 3, 2),
+            consumed_date=datetime(2023, 3, 2),
             pros=['Keeps you on the edge of your seat.'],
             cons=['Somewhat predictable ending.'],
             genres=[genre4]
@@ -199,7 +235,7 @@ def create_example_reviews_and_genres():
             run_time=150,
             creator='Reviewer 4',
             media_creation_date=datetime(2023, 4, 1),
-            date_consumed=datetime(2023, 4, 2),
+            consumed_date=datetime(2023, 4, 2),
             pros=['Great special effects.'],
             cons=['A bit too long.'],
             genres=[genre5]
@@ -217,7 +253,7 @@ def create_example_reviews_and_genres():
             run_time=45,
             creator='Reviewer 5',
             media_creation_date=datetime(2023, 5, 1),
-            date_consumed=datetime(2023, 5, 2),
+            consumed_date=datetime(2023, 5, 2),
             pros=['Great chemistry between leads.'],
             cons=['Some clichés.'],
             genres=[genre6]
@@ -235,7 +271,7 @@ def create_example_reviews_and_genres():
             run_time=90,
             creator='Reviewer 6',
             media_creation_date=datetime(2023, 6, 1),
-            date_consumed=datetime(2023, 6, 2),
+            consumed_date=datetime(2023, 6, 2),
             pros=['Very informative.'],
             cons=['Could have included more interviews.'],
             genres=[genre2, genre5]

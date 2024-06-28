@@ -1,15 +1,14 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 import os
 from config import Config
 from app.extensions import db, limiter, cors, login_manager, socketio
 from app.middleware import register_middlewares
 
-# Import DB models
+# Import DB models so they're within context
 from app.models.user import create_admin_user
 from app.models.request_log import RequestLog
 from app.models.frontend_log import FrontendLog  # Ensure the model is imported so its registered
-from app.models.media_reviews import MediaReviewGenre, MediaReview, Genre,  initialise_media_reviews, create_example_reviews_and_genres
-
+from app.models.media_reviews import MediaReviewGenre, MediaReview, Genre, initialise_media_reviews, create_example_reviews_and_genres
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -26,7 +25,7 @@ def create_app(config_class=Config):
         
         db.create_all()
 
-        create_example_reviews_and_genres()
+        # create_example_reviews_and_genres()
         # Create admin user here if needed
     # Initialise sensor data table if it doesn't exist (this uses timescale db)
     from app.models.weather_data import setup_sensor_data_table
@@ -70,5 +69,9 @@ def create_app(config_class=Config):
 
     from app.mediareviews import bp as mediareviews_bp
     app.register_blueprint(mediareviews_bp, url_prefix='/mediareviews')
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return  jsonify({"error": f"rate limit exceeded {e.description}"}), 429
     
     return app
