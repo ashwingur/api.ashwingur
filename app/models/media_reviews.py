@@ -111,7 +111,7 @@ def create_new_media_review(media_review: MediaReview, genres: List[str]) -> Res
 
         db.session.commit()
 
-        return jsonify({"message": "Media review created successfully"}), 201
+        return jsonify({ 'id': media_review.id}), 201
 
     except IntegrityError:
         db.session.rollback()
