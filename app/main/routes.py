@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import render_template, request, jsonify
+from flask import app, render_template, request, jsonify
 from app.main import bp
 from app.extensions import limiter, login_manager, db
 from flask_login import login_user, logout_user, login_required, current_user
@@ -93,7 +93,9 @@ def login():
         login_user(user, remember=True)
         user.last_login_timestamp = datetime.now(ZoneInfo("UTC"))
         db.session.commit()
-        return jsonify({'authenticated': True, 'username': user.username, 'role': user.role}), 200
+        response = jsonify({'authenticated': True, 'username': user.username, 'role': user.role})
+        
+        return response, 200
 
     return jsonify({'message': 'Invalid credentials', 'authenticated': False}), 401
 

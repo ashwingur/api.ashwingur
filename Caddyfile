@@ -26,7 +26,7 @@
 # Refer to the Caddy docs for more information:
 # https://caddyserver.com/docs/caddyfile
 
-localhost {
+http://localhost:5000 {
     reverse_proxy flask_app:5000
 }
 

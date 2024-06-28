@@ -1,6 +1,8 @@
 from datetime import datetime
 import sys
+from typing import List
 
+from flask import Response, jsonify
 from sqlalchemy import ARRAY, Boolean, TIMESTAMP, inspect, text
 from zoneinfo import ZoneInfo
 from app.extensions import db
@@ -90,6 +92,30 @@ def get_all_media_reviews_with_genres():
         result.append(review_data)
 
     return result
+
+
+def create_new_media_review(media_review: MediaReview, genres: List[str]) -> Response:
+    try:
+        db.session.add(media_review)
+        db.session.commit()
+
+        for genre_name in genres:
+            genre = Genre.query.filter_by(name=genre_name).first()
+            if not genre:
+                genre = Genre(name=genre_name)
+                db.session.add(genre)
+                db.session.commit()
+
+            media_review_genre = MediaReviewGenre(media_review_id=media_review.id, genre_id=genre.id)
+            db.session.add(media_review_genre)
+
+        db.session.commit()
+
+        return jsonify({"message": "Media review created successfully"}), 201
+
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred while creating the media review"}), 500
 
 
 # Utility function

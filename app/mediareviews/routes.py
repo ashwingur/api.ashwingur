@@ -1,11 +1,14 @@
+from flask_login import login_required
 from app.mediareviews import bp
 from flask import jsonify, request
-from app.models.media_reviews import MediaReview, Genre, MediaReviewGenre, get_all_media_reviews_with_genres
-from app.extensions import db
+from app.models.media_reviews import MediaReview, get_all_media_reviews_with_genres, create_new_media_review
+from app.extensions import db, roles_required
 from sqlalchemy.exc import IntegrityError
 
 
 @bp.route('', methods=['GET', 'POST'])
+@login_required
+@roles_required('admin')
 def test():
     if request.method == 'GET':
         return get_all_media_reviews_with_genres()
@@ -51,24 +54,6 @@ def test():
             visible=visible
         )
 
-        try:
-            db.session.add(media_review)
-            db.session.commit()
+        response = create_new_media_review(media_review, genres)
 
-            for genre_name in genres:
-                genre = Genre.query.filter_by(name=genre_name).first()
-                if not genre:
-                    genre = Genre(name=genre_name)
-                    db.session.add(genre)
-                    db.session.commit()
-
-                media_review_genre = MediaReviewGenre(media_review_id=media_review.id, genre_id=genre.id)
-                db.session.add(media_review_genre)
-
-            db.session.commit()
-
-            return jsonify({"message": "Media review created successfully"}), 201
-
-        except IntegrityError:
-            db.session.rollback()
-            return jsonify({"error": "An error occurred while creating the media review"}), 500
+        return response
