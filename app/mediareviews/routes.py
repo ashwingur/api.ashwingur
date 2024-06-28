@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys
 from flask_login import login_required
 from app.mediareviews import bp
@@ -5,6 +6,8 @@ from flask import jsonify, request
 from app.models.media_reviews import MediaReview, get_all_media_reviews_with_genres, create_new_media_review, update_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
+
+from zoneinfo import ZoneInfo
 
 # Validate the field values, excluding ID
 # Returns none if there is no issue, otherwise returns a response
@@ -27,7 +30,7 @@ def validate_media_review(data):
     if not name or not media_type:
         return jsonify({"error": "name and media_type are required"}), 400
     if media_type not in ["Movie", "Book", "Show", "Game", "Music"]:
-        return jsonify({"error": f"Unknown media type {media_type}. It should be 'Movie', 'Book', 'Show', 'Game' or 'Music'"}), 400
+        return jsonify({"error": f"Unknown media_type '{media_type}'. It should be 'Movie', 'Book', 'Show', 'Game' or 'Music'"}), 400
     if media_creation_date and not is_valid_iso_string(media_creation_date):
         return jsonify({"error": f"media_creation_date '{media_creation_date}' is not a valid ISO 8601 date"}), 400
     if consumed_date and not is_valid_iso_string(consumed_date):
@@ -118,7 +121,7 @@ def update_review(review_id):
     # Retrieve the media review by ID
     media_review = MediaReview.query.get(review_id)
     if not media_review:
-        return jsonify({"error": "Media review not found"}), 404
+        return jsonify({"error": f"Media review with id '{review_id}' not found"}), 404
     
     # Check if values are valid
     invalid_response = validate_media_review(data)
@@ -139,6 +142,7 @@ def update_review(review_id):
     media_review.pros = data.get('pros', media_review.pros)
     media_review.cons = data.get('cons', media_review.cons)
     media_review.visible = data.get('visible', media_review.visible)
+    media_review.review_last_update_date = datetime.now(tz=ZoneInfo("UTC"))
 
     # Handle genres
     new_genres = data.get('genres', [])

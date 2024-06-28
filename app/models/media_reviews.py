@@ -3,7 +3,7 @@ import sys
 from typing import Dict, List
 
 from flask import Response, jsonify
-from sqlalchemy import ARRAY, Boolean, TIMESTAMP, inspect, text
+from sqlalchemy import ARRAY, Boolean, TIMESTAMP, func, inspect, text
 from zoneinfo import ZoneInfo
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
@@ -37,7 +37,7 @@ class MediaReview(db.Model):
     name = db.Column(db.String, nullable=False)
     media_type = db.Column(db.String, nullable=False)
     review_creation_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
-    review_last_update_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
+    review_last_update_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
     cover_image = db.Column(db.String)
     rating = db.Column(db.Float)
     review_content = db.Column(db.Text)
@@ -148,7 +148,7 @@ def update_media_review(media_review: MediaReview, genres: List[str]):
         # Commit the changes
         db.session.commit()
 
-        return jsonify({"message": "Media review updated successfully"}), 200
+        return jsonify(media_review_to_response_item(media_review)), 200
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "An error occurred while updating the media review"}), 500
