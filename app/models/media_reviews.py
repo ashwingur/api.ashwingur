@@ -102,6 +102,7 @@ def create_new_media_review(media_review: MediaReview, genres: List[str]):
         if existing_review:
             return jsonify({"error": f"A media review with the name '{existing_review.name}' and media_type '{existing_review.media_type}' already exists (id: {existing_review.id})"}), 409
 
+        media_review.review_creation_date = datetime.now(tz=ZoneInfo("UTC"))
 
         db.session.add(media_review)
         db.session.commit()
