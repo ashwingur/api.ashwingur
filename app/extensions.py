@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import abort, request
+from flask import abort, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -16,6 +16,14 @@ db = SQLAlchemy()
 cors = CORS()
 
 login_manager = LoginManager()
+
+# Custom json resposne for the 401
+@login_manager.unauthorized_handler
+def unauthorised_handler():
+    if request.method == 'GET':
+        return jsonify({"error": "You are unauthorised to access this data"}), 401
+    else:
+        return jsonify({"error": "You are unauthorised to perform this action"}), 401
 
 socketio = SocketIO()
 
