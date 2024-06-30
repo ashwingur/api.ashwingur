@@ -4,7 +4,7 @@ from flask_login import login_required
 from marshmallow import ValidationError
 from app.mediareviews import bp
 from flask import jsonify, request
-from app.models.media_reviews import MediaReview, SubMediaReview, sub_media_review_schema
+from app.models.media_reviews import MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema
 from app.models.media_reviews import get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
@@ -60,7 +60,15 @@ def validate_media_review(data):
 @bp.route('', methods=['GET'])
 @limiter.limit('20/minute', override_defaults=True)
 def get_review():
-    return get_all_media_reviews_with_genres()
+    # return get_all_media_reviews_with_genres()
+    # Query all media reviews from the database
+    media_reviews = MediaReview.query.all()
+
+    # Serialize the media reviews
+    media_reviews_data = media_reviews_list_schema.dump(media_reviews)
+
+    # Return the serialized data as a JSON response
+    return jsonify(media_reviews_data)
 
 
 @bp.route('', methods=['POST'])

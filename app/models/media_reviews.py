@@ -9,7 +9,7 @@ from app.extensions import db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy.orm import joinedload, relationship
-from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema, auto_field
 from marshmallow import fields, validates_schema, ValidationError, validate
 from app.custom_validators import validate_non_empty_string_list
 
@@ -150,6 +150,53 @@ class SubMediaReview(db.Model):
             return jsonify({"error": "An error occurred while updating the media review"}), 500
 
 
+class GenreSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = Genre
+        load_instance = True
+        include_fk = True
+        sqla_session = db.session
+
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True, validate=validate.Length(min=1))
+
+# Define custom field for genre names
+
+
+class GenreNamesField(fields.Field):
+    def _serialize(self, value, attr, obj, **kwargs):
+        if value is None:
+            return []
+        return [genre.name for genre in value]
+
+
+class MediaReviewSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = SubMediaReview
+        load_instance = True
+        include_fk = True
+        sqla_session = db.session
+
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True, validate=validate.Length(min=1))
+    media_type = fields.Str(validate=validate.OneOf(
+        ["Movie", "Book", "Show", "Game", "Music"]))
+    review_creation_date = fields.DateTime(dump_only=True)
+    review_last_update_date = fields.DateTime(dump_only=True)
+    cover_image = fields.Str()
+    rating = fields.Float(validate=validate.Range(min=0.0, max=10.0))
+    review_content = fields.Str()
+    word_count = fields.Int(validate=validate.Range(min=0))
+    run_time = fields.Int(validate=validate.Range(min=0))
+    creator = fields.Str()
+    media_creation_date = fields.DateTime()
+    consumed_date = fields.DateTime()
+    pros = fields.List(fields.Str(), validate=validate_non_empty_string_list)
+    cons = fields.List(fields.Str(), validate=validate_non_empty_string_list)
+    visible = fields.Bool(required=True)
+    genres = GenreNamesField()
+
+
 class SubMediaReviewSchema(SQLAlchemyAutoSchema):
     class Meta:
         model = SubMediaReview
@@ -160,7 +207,7 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
     id = fields.Int(dump_only=True)
     media_review_id = fields.Int(required=True, validate=validate.Range(min=1))
     display_index = fields.Int(required=True, validate=validate.Range(min=0))
-    name = fields.Str(required=True)
+    name = fields.Str(required=True, validate=validate.Length(min=1))
     review_creation_date = fields.DateTime(dump_only=True)
     review_last_update_date = fields.DateTime(dump_only=True)
     cover_image = fields.Str()
@@ -176,6 +223,8 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
 
 # Instantiate the schema
 sub_media_review_schema = SubMediaReviewSchema()
+media_review_schema = MediaReviewSchema()
+media_reviews_list_schema = MediaReviewSchema(many=True)
 
 
 def media_review_to_response_item(review: MediaReview) -> Dict[str, any]:
