@@ -4,7 +4,7 @@ from flask_login import login_required
 from marshmallow import ValidationError
 from app.mediareviews import bp
 from flask import jsonify, request
-from app.models.media_reviews import MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema
+from app.models.media_reviews import MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema
 from app.models.media_reviews import get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
@@ -60,7 +60,6 @@ def validate_media_review(data):
 @bp.route('', methods=['GET'])
 @limiter.limit('20/minute', override_defaults=True)
 def get_review():
-    # return get_all_media_reviews_with_genres()
     # Query all media reviews from the database
     media_reviews = MediaReview.query.all()
 
@@ -76,51 +75,79 @@ def get_review():
 @login_required
 @roles_required('admin')
 def create_review():
-    data = request.json
+    json_data = request.get_json()
 
-    id = data.get('id')
-    if id is not None:
-        return jsonify({"error": "ID should be null when creating a new media review"}), 400
+    if 'id' in json_data:
+        json_data.pop('id')
 
-    # Check if values are valid
-    invalid_response = validate_media_review(data)
-    if invalid_response:
-        return invalid_response
+    print(f'json data: {json_data}', file=sys.stderr)
 
-    name = data.get('name')
-    media_type = data.get('media_type')
-    cover_image = data.get('cover_image')
-    rating = data.get('rating')
-    review_content = data.get('review_content')
-    word_count = data.get('word_count')
-    run_time = data.get('run_time')
-    creator = data.get('creator')
-    media_creation_date = data.get('media_creation_date')
-    consumed_date = data.get('consumed_date')
-    pros = data.get('pros')
-    cons = data.get('cons')
-    visible = data.get('visible', True)
-    genres = data.get('genres', [])
+    try:
+        media_review: MediaReview = media_review_schema.load(json_data)
+    except ValidationError as err:
+        return jsonify({"error": f"Issue with provided fields: {err.messages}"}), 422
 
-    media_review = MediaReview(
-        name=name,
-        media_type=media_type,
-        cover_image=cover_image,
-        rating=rating,
-        review_content=review_content,
-        word_count=word_count,
-        run_time=run_time,
-        creator=creator,
-        media_creation_date=media_creation_date,
-        consumed_date=consumed_date,
-        pros=pros,
-        cons=cons,
-        visible=visible
-    )
+    genres = media_review.genres
+    print(f'genres: {genres}', file=sys.stderr)
 
-    response = create_new_media_review(media_review, genres)
+    # Check if the SubMediaReview already exists with the same name for the given media_review
+    existing_review = MediaReview.query.filter_by(
+        name=media_review.name).first()
+    if existing_review:
+        return jsonify({"error": f"Media with the name '{media_review.name}' already exists"}), 409
 
-    return response
+    db.session.add(media_review)
+    db.session.commit()
+    result = media_review_schema.dump(media_review)
+    return jsonify(result), 201
+    # for genre_name  in genres:
+    #     genre = Genre.quer
+
+    # data = request.json
+
+    # id = data.get('id')
+    # if id is not None:
+    #     return jsonify({"error": "ID should be null when creating a new media review"}), 400
+
+    # # Check if values are valid
+    # invalid_response = validate_media_review(data)
+    # if invalid_response:
+    #     return invalid_response
+
+    # name = data.get('name')
+    # media_type = data.get('media_type')
+    # cover_image = data.get('cover_image')
+    # rating = data.get('rating')
+    # review_content = data.get('review_content')
+    # word_count = data.get('word_count')
+    # run_time = data.get('run_time')
+    # creator = data.get('creator')
+    # media_creation_date = data.get('media_creation_date')
+    # consumed_date = data.get('consumed_date')
+    # pros = data.get('pros')
+    # cons = data.get('cons')
+    # visible = data.get('visible', True)
+    # genres = data.get('genres', [])
+
+    # media_review = MediaReview(
+    #     name=name,
+    #     media_type=media_type,
+    #     cover_image=cover_image,
+    #     rating=rating,
+    #     review_content=review_content,
+    #     word_count=word_count,
+    #     run_time=run_time,
+    #     creator=creator,
+    #     media_creation_date=media_creation_date,
+    #     consumed_date=consumed_date,
+    #     pros=pros,
+    #     cons=cons,
+    #     visible=visible
+    # )
+
+    # response = create_new_media_review(media_review, genres)
+
+    # return response
 
 
 @bp.route('/<int:review_id>', methods=['PUT'])

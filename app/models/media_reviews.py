@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy.orm import joinedload, relationship
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema, auto_field
-from marshmallow import fields, validates_schema, ValidationError, validate
+from marshmallow import fields, post_load, pre_load, validates_schema, ValidationError, validate
 from app.custom_validators import validate_non_empty_string_list
 
 SCHEMA = 'media_reviews_schema'
@@ -66,6 +66,10 @@ class MediaReview(db.Model):
     # Define relationship to SubMediaReview
     sub_media_reviews = relationship(
         'SubMediaReview', back_populates='media_review', cascade="all, delete-orphan")
+
+    def insert(self):
+        for genre_name in self.genres:
+            pass
 
 
 class Genre(db.Model):
@@ -163,16 +167,57 @@ class GenreSchema(SQLAlchemyAutoSchema):
 # Define custom field for genre names
 
 
-class GenreNamesField(fields.Field):
+# class GenreNamesField(fields.Field):
+#     def _serialize(self, value, attr, obj, **kwargs):
+#         if value is None:
+#             return []
+#         return [genre.name for genre in value]
+
+#     def _deserialize(self, value, attr, data, **kwargs):
+#         if not isinstance(value, list):
+#             raise ValidationError("Genres must be a list.")
+#         for item in value:
+#             if not isinstance(item, str) or not item.strip():
+#                 raise ValidationError("Each genre must be a non-empty string.")
+#         return value
+
+class GenreNameField(fields.List):
+    def __init__(self, cls_or_instance, **kwargs):
+        super().__init__(cls_or_instance, **kwargs)
+        self.validate = [self.ensure_list_of_strings]
+
+    def ensure_list_of_strings(self, value):
+        if not isinstance(value, list):
+            raise ValidationError("Field should be a list of strings")
+        for item in value:
+            if not isinstance(item, str) or not item.strip():
+                raise ValidationError("All items must be non-empty strings")
+
+    def _deserialize(self, value, attr, data, **kwargs):
+        if not isinstance(value, list):
+            raise ValidationError("Field should be a list of strings")
+        genres = []
+        for name in value:
+            if not isinstance(name, str) and not name:
+                raise ValidationError("Field should be non empty strings")
+
+            genre = db.session.query(Genre).filter_by(name=name).first()
+            if not genre:
+                genre = Genre(name=name)
+                db.session.add(genre)
+                # db.session.commit()
+            genres.append(genre)
+        return genres
+
     def _serialize(self, value, attr, obj, **kwargs):
-        if value is None:
+        if not value:
             return []
         return [genre.name for genre in value]
 
 
 class MediaReviewSchema(SQLAlchemyAutoSchema):
     class Meta:
-        model = SubMediaReview
+        model = MediaReview
         load_instance = True
         include_fk = True
         sqla_session = db.session
@@ -183,18 +228,33 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         ["Movie", "Book", "Show", "Game", "Music"]))
     review_creation_date = fields.DateTime(dump_only=True)
     review_last_update_date = fields.DateTime(dump_only=True)
-    cover_image = fields.Str()
-    rating = fields.Float(validate=validate.Range(min=0.0, max=10.0))
-    review_content = fields.Str()
-    word_count = fields.Int(validate=validate.Range(min=0))
-    run_time = fields.Int(validate=validate.Range(min=0))
-    creator = fields.Str()
-    media_creation_date = fields.DateTime()
-    consumed_date = fields.DateTime()
+    cover_image = fields.Str(allow_none=True)
+    rating = fields.Float(validate=validate.Range(
+        min=0.0, max=10.0), allow_none=True)
+    review_content = fields.Str(allow_none=True)
+    word_count = fields.Int(validate=validate.Range(min=0), allow_none=True)
+    run_time = fields.Int(validate=validate.Range(min=0), allow_none=True)
+    creator = fields.Str(allow_none=True)
+    media_creation_date = fields.DateTime(allow_none=True)
+    consumed_date = fields.DateTime(allow_none=True)
     pros = fields.List(fields.Str(), validate=validate_non_empty_string_list)
     cons = fields.List(fields.Str(), validate=validate_non_empty_string_list)
     visible = fields.Bool(required=True)
-    genres = GenreNamesField()
+    genres = fields.Pluck(GenreSchema, 'name', many=True)
+
+    @pre_load
+    def handle_null_fields(self, data, **kwargs):
+        if 'pros' not in data or data['pros'] is None:
+            data['pros'] = []
+        if 'cons' not in data or data['cons'] is None:
+            data['cons'] = []
+        if 'genres' not in data or data['genres'] is None:
+            data['genres'] = []
+        if 'review_last_update_date' in data and data['review_last_update_date'] is None:
+            del data['review_last_update_date']
+        if 'review_creation_date' in data and data['review_creation_date'] is None:
+            del data['review_creation_date']
+        return data
 
 
 class SubMediaReviewSchema(SQLAlchemyAutoSchema):
