@@ -54,6 +54,8 @@ def get_metadata():
 def include_object(object, name, type_, reflected, compare_to):
     if type_ == "table" and object.schema and 'timescaledb_' in object.schema:
         return False
+    if type_ == "index" and name == "sensor_data_timestamp_idx":
+        return False
     return True
 
 def run_migrations_offline():

@@ -18,33 +18,15 @@ class SensorData(db.Model):
     eco2 = db.Column(db.SmallInteger)
 
 # Create the sensor data table and convert it to a hypertable
-def setup_sensor_data_table(init_hypertable=True):
+def setup_sensor_data_table():
     conn = psycop_conn()
     cur = conn.cursor()
 
-    # Create the data table if it does not exist
-    # create sensor data hypertable
-    # query_create_sensordata_table = """
-    # CREATE TABLE IF NOT EXISTS sensor_data (
-    #     timestamp TIMESTAMPTZ NOT NULL,
-    #     temperature FLOAT,
-    #     pressure FLOAT,
-    #     humidity FLOAT,
-    #     ambient_light FLOAT,
-    #     air_quality_index SMALLINT CHECK (air_quality_index >= 1 AND air_quality_index <= 5),
-    #     TVOC SMALLINT,
-    #     eCO2 SMALLINT
-    # );
-    # """
-
-    # cur.execute(query_create_sensordata_table)
-
     # Convert the table to a hypertable if it is not already one
-    if init_hypertable:
-        create_hypertable_query = """
-        SELECT create_hypertable('sensor_data', 'timestamp', if_not_exists => TRUE);
-        """
-        cur.execute(create_hypertable_query)
+    create_hypertable_query = """
+    SELECT create_hypertable('sensor_data', 'timestamp', if_not_exists => TRUE);
+    """
+    cur.execute(create_hypertable_query)
 
     # Commit the changes and close the connection
     conn.commit()
