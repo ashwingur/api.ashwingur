@@ -5,6 +5,7 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(150))
     content = db.Column(db.Text)
+    new_test_column = db.Column(db.Text)
 
     @property
     def serialised(self):
