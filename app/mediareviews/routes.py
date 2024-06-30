@@ -1,15 +1,20 @@
 from datetime import datetime
 import sys
 from flask_login import login_required
+from marshmallow import ValidationError
 from app.mediareviews import bp
 from flask import jsonify, request
-from app.models.media_reviews import MediaReview, get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
+from app.models.media_reviews import MediaReview, SubMediaReview, sub_media_review_schema
+from app.models.media_reviews import get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
 from zoneinfo import ZoneInfo
+from sqlalchemy.exc import IntegrityError
 
 # Validate the field values, excluding ID
 # Returns none if there is no issue, otherwise returns a response
+
+
 def validate_media_review(data):
     name = data.get('name')
     media_type = data.get('media_type')
@@ -48,7 +53,7 @@ def validate_media_review(data):
         return jsonify({"error": f"visible must be a boolean"}), 400
     if not is_valid_list_of_non_empty_strings(genres):
         return jsonify({"error": f"genres must be a list of non-empty strings"}), 400
-    
+
     return None
 
 
@@ -56,24 +61,24 @@ def validate_media_review(data):
 @limiter.limit('20/minute', override_defaults=True)
 def get_review():
     return get_all_media_reviews_with_genres()
-    
+
 
 @bp.route('', methods=['POST'])
 @limiter.limit('10/minute', override_defaults=True)
 @login_required
 @roles_required('admin')
-def post_review():
+def create_review():
     data = request.json
 
     id = data.get('id')
     if id is not None:
         return jsonify({"error": "ID should be null when creating a new media review"}), 400
-    
+
     # Check if values are valid
     invalid_response = validate_media_review(data)
     if invalid_response:
         return invalid_response
-    
+
     name = data.get('name')
     media_type = data.get('media_type')
     cover_image = data.get('cover_image')
@@ -88,7 +93,6 @@ def post_review():
     cons = data.get('cons')
     visible = data.get('visible', True)
     genres = data.get('genres', [])
-
 
     media_review = MediaReview(
         name=name,
@@ -110,6 +114,7 @@ def post_review():
 
     return response
 
+
 @bp.route('/<int:review_id>', methods=['PUT'])
 @limiter.limit('10/minute', override_defaults=True)
 @login_required
@@ -121,7 +126,7 @@ def update_review(review_id):
     media_review = MediaReview.query.get(review_id)
     if not media_review:
         return jsonify({"error": f"Media review with id '{review_id}' not found"}), 404
-    
+
     # Check if values are valid
     invalid_response = validate_media_review(data)
     if invalid_response:
@@ -130,14 +135,18 @@ def update_review(review_id):
     # Update the media review fields
     media_review.name = data.get('name', media_review.name)
     media_review.media_type = data.get('media_type', media_review.media_type)
-    media_review.cover_image = data.get('cover_image', media_review.cover_image)
+    media_review.cover_image = data.get(
+        'cover_image', media_review.cover_image)
     media_review.rating = data.get('rating', media_review.rating)
-    media_review.review_content = data.get('review_content', media_review.review_content)
+    media_review.review_content = data.get(
+        'review_content', media_review.review_content)
     media_review.word_count = data.get('word_count', media_review.word_count)
     media_review.run_time = data.get('run_time', media_review.run_time)
     media_review.creator = data.get('creator', media_review.creator)
-    media_review.media_creation_date = data.get('media_creation_date', media_review.media_creation_date)
-    media_review.consumed_date = data.get('consumed_date', media_review.consumed_date)
+    media_review.media_creation_date = data.get(
+        'media_creation_date', media_review.media_creation_date)
+    media_review.consumed_date = data.get(
+        'consumed_date', media_review.consumed_date)
     media_review.pros = data.get('pros', media_review.pros)
     media_review.cons = data.get('cons', media_review.cons)
     media_review.visible = data.get('visible', media_review.visible)
@@ -148,6 +157,7 @@ def update_review(review_id):
     response = update_media_review(media_review, new_genres)
 
     return response
+
 
 @bp.route('/<int:review_id>', methods=['DELETE'])
 @limiter.limit('3/minute; 20/hour', override_defaults=True)
@@ -163,6 +173,67 @@ def delete_review(review_id):
     return response
 
 
+@bp.route('/submediareview/<int:id>', methods=['GET'])
+def get_submediareview(id):
+    sub_media_review = SubMediaReview.query.get(id)
+    if not sub_media_review:
+        return jsonify({"error": "SubMediaReview not found"}), 404
+
+    result = sub_media_review_schema.dump(sub_media_review)
+    return jsonify(result), 200
+
+
+@bp.route('/submediareview', methods=['POST'])
+def create_submediareview():
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({'error': 'No input data provided'}), 400
+
+    try:
+        # Validate and deserialize input
+        new_sub_media_review: SubMediaReview = sub_media_review_schema.load(
+            json_data)
+    except ValidationError as err:
+        return jsonify({"error": f"Issue with provided fields: {err.messages}"}), 422
+
+    return new_sub_media_review.insert()
+
+
+@bp.route('/submediareview/<int:id>', methods=['PUT'])
+def update_submediareview(id):
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({'error': 'No input data provided'}), 400
+
+    sub_media_review = SubMediaReview.query.get(id)
+    if not sub_media_review:
+        return jsonify({"error": "SubMediaReview not found"}), 404
+
+    try:
+        # Validate and deserialize input
+        updated_sub_media_review: SubMediaReview = sub_media_review_schema.load(
+            json_data, instance=sub_media_review, partial=True)
+    except ValidationError as err:
+        return jsonify({"error": f"Issue with provided fields: {err.messages}"}), 422
+
+    return updated_sub_media_review.update()
+
+
+@bp.route('/submediareview/<int:id>', methods=['DELETE'])
+def delete_submediareview(id):
+    sub_media_review = SubMediaReview.query.get(id)
+    if not sub_media_review:
+        return jsonify({"error": "SubMediaReview not found"}), 404
+
+    try:
+        db.session.delete(sub_media_review)
+        db.session.commit()
+        return '', 204
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred while deleting the media review"}), 500
+
+
 def is_valid_list_of_non_empty_strings(obj):
     if not isinstance(obj, list):
         return False
@@ -170,6 +241,7 @@ def is_valid_list_of_non_empty_strings(obj):
         if not isinstance(item, str) or not item.strip():
             return False
     return True
+
 
 def is_valid_iso_string(date_string):
     try:

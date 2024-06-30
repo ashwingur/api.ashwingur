@@ -3,23 +3,30 @@ import sys
 from typing import Dict, List
 
 from flask import Response, jsonify
-from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, func, inspect, text
+from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func, inspect, text
 from zoneinfo import ZoneInfo
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy.orm import joinedload, relationship
-
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from marshmallow import fields, validates_schema, ValidationError, validate
+from app.custom_validators import validate_non_empty_string_list
 
 SCHEMA = 'media_reviews_schema'
 
 # Association table for the many-to-many relationship between MediaReview and Genre
+
+
 class MediaReviewGenre(db.Model):
     __tablename__ = 'media_review_genre'
     __table_args__ = {'schema': SCHEMA}
 
-    media_review_id = db.Column(db.Integer, db.ForeignKey(f'{SCHEMA}.media_reviews.id'), primary_key=True)
-    genre_id = db.Column(db.Integer, db.ForeignKey(f'{SCHEMA}.genres.id'), primary_key=True)
+    media_review_id = Column(Integer, ForeignKey(
+        f'{SCHEMA}.media_reviews.id'), primary_key=True)
+    genre_id = Column(Integer, ForeignKey(
+        f'{SCHEMA}.genres.id'), primary_key=True)
+
 
 def initialise_media_reviews():
     with db.engine.connect() as connection:
@@ -33,62 +40,143 @@ class MediaReview(db.Model):
     __tablename__ = 'media_reviews'
     __table_args__ = {'schema': SCHEMA}
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-    media_type = db.Column(db.String, nullable=False)
-    review_creation_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
-    review_last_update_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
-    cover_image = db.Column(db.String)
-    rating = db.Column(db.Float)
-    review_content = db.Column(db.Text)
-    word_count = db.Column(db.Integer)
-    run_time = db.Column(db.Integer)
-    creator = db.Column(db.String)
-    media_creation_date = db.Column(TIMESTAMP(timezone=True))
-    consumed_date = db.Column(TIMESTAMP(timezone=True))
-    pros = db.Column(ARRAY(db.String))
-    cons = db.Column(ARRAY(db.String))
-    visible = db.Column(Boolean, default=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    media_type = Column(String, nullable=False)
+    review_creation_date = Column(TIMESTAMP(
+        timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
+    review_last_update_date = Column(TIMESTAMP(timezone=True), default=datetime.now(
+        tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
+    cover_image = Column(String)
+    rating = Column(Float)
+    review_content = Column(Text)
+    word_count = Column(Integer)
+    run_time = Column(Integer)
+    creator = Column(String)
+    media_creation_date = Column(TIMESTAMP(timezone=True))
+    consumed_date = Column(TIMESTAMP(timezone=True))
+    pros = Column(ARRAY(String))
+    cons = Column(ARRAY(String))
+    visible = Column(Boolean, default=True)
 
     # Define relationship to Genre
-    genres = db.relationship('Genre', secondary=f'{SCHEMA}.media_review_genre', back_populates='media_reviews')
+    genres = relationship(
+        'Genre', secondary=f'{SCHEMA}.media_review_genre', back_populates='media_reviews')
 
     # Define relationship to SubMediaReview
-    # sub_media_reviews = relationship('SubMediaReview', back_populates='media_review', cascade="all, delete-orphan")
-
-
-# class SubMediaReview(db.Model):
-#     __tablename__ = 'sub_media_reviews'
-#     __table_args__ = {'schema': SCHEMA}
-
-#     id = Column(Integer, primary_key=True)
-#     media_review_id = db.Column(Integer, ForeignKey(f'{SCHEMA}.media_reviews.id'), nullable=False)
-#     name = db.Column(String, nullable=False)
-#     review_creation_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
-#     review_last_update_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
-#     cover_image = db.Column(String)
-#     rating = db.Column(Float)
-#     review_content = db.Column(Text)
-#     word_count = db.Column(Integer)
-#     run_time = db.Column(Integer)
-#     media_creation_date = db.Column(TIMESTAMP(timezone=True))
-#     consumed_date = db.Column(TIMESTAMP(timezone=True))
-#     pros = db.Column(ARRAY(String))
-#     cons = db.Column(ARRAY(String))
-
-#     media_review = relationship('MediaReview', back_populates='sub_media_reviews')
-
+    sub_media_reviews = relationship(
+        'SubMediaReview', back_populates='media_review', cascade="all, delete-orphan")
 
 
 class Genre(db.Model):
     __tablename__ = 'genres'
     __table_args__ = {'schema': SCHEMA}
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False, unique=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
 
     # Define relationship to MediaReview
-    media_reviews = db.relationship('MediaReview', secondary=f'{SCHEMA}.media_review_genre', back_populates='genres')
+    media_reviews = db.relationship(
+        'MediaReview', secondary=f'{SCHEMA}.media_review_genre', back_populates='genres')
+
+
+class SubMediaReview(db.Model):
+    __tablename__ = 'sub_media_reviews'
+    __table_args__ = {'schema': SCHEMA}
+
+    id = Column(Integer, primary_key=True)
+    media_review_id = Column(Integer, ForeignKey(
+        f'{SCHEMA}.media_reviews.id'), nullable=False)
+    display_index = Column(Integer, nullable=False)
+    name = Column(String, nullable=False)
+    review_creation_date = Column(TIMESTAMP(
+        timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
+    review_last_update_date = Column(TIMESTAMP(timezone=True), default=datetime.now(
+        tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
+    cover_image = Column(String)
+    rating = Column(Float)
+    review_content = Column(Text)
+    word_count = Column(Integer)
+    run_time = Column(Integer)
+    media_creation_date = Column(TIMESTAMP(timezone=True))
+    consumed_date = Column(TIMESTAMP(timezone=True))
+    pros = Column(ARRAY(String))
+    cons = Column(ARRAY(String))
+
+    media_review = relationship(
+        'MediaReview', back_populates='sub_media_reviews')
+
+    def insert(self):
+        # Extract name and media_review_id for checking existence
+        name = self.name
+        media_review_id = self.media_review_id
+
+        # Check if the MediaReview exists
+        media_review = MediaReview.query.get(media_review_id)
+        if not media_review:
+            return jsonify({"error": "MediaReview with this ID does not exist"}), 404
+
+        # Check if the SubMediaReview already exists with the same name for the given media_review
+        existing_review = SubMediaReview.query.filter_by(
+            name=name, media_review_id=media_review_id).first()
+        if existing_review:
+            return jsonify({"error": f"SubMediaReview with the name '{name}' already exists for the given media review"}), 409
+
+        try:
+            db.session.add(self)
+            db.session.commit()
+
+            # Serialize the new SubMediaReview instance
+            result = sub_media_review_schema.dump(self)
+            return jsonify(result), 201
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"error": "An error occurred while creating the media review"}), 500
+
+    def update(self):
+        # Check if one with the same name already exists
+        existing_review = SubMediaReview.query.filter_by(
+            name=self.name, media_review_id=self.media_review_id).first()
+
+        if existing_review and existing_review.id != self.id:
+            return jsonify({"error": f"SubMediaReview with the name '{existing_review.name}' already exists for the given media review"}), 409
+
+        try:
+            db.session.commit()
+            result = sub_media_review_schema.dump(self)
+            return jsonify(result), 200
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"error": "An error occurred while updating the media review"}), 500
+
+
+class SubMediaReviewSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = SubMediaReview
+        load_instance = True
+        include_fk = True
+        sqla_session = db.session
+
+    id = fields.Int(dump_only=True)
+    media_review_id = fields.Int(required=True, validate=validate.Range(min=1))
+    display_index = fields.Int(required=True, validate=validate.Range(min=0))
+    name = fields.Str(required=True)
+    review_creation_date = fields.DateTime(dump_only=True)
+    review_last_update_date = fields.DateTime(dump_only=True)
+    cover_image = fields.Str()
+    rating = fields.Float(validate=validate.Range(min=0.0, max=10.0))
+    review_content = fields.Str()
+    word_count = fields.Int(validate=validate.Range(min=0))
+    run_time = fields.Int(validate=validate.Range(min=0))
+    media_creation_date = fields.DateTime()
+    consumed_date = fields.DateTime()
+    pros = fields.List(fields.Str(), validate=validate_non_empty_string_list)
+    cons = fields.List(fields.Str(), validate=validate_non_empty_string_list)
+
+
+# Instantiate the schema
+sub_media_review_schema = SubMediaReviewSchema()
+
 
 def media_review_to_response_item(review: MediaReview) -> Dict[str, any]:
     return {
@@ -111,8 +199,10 @@ def media_review_to_response_item(review: MediaReview) -> Dict[str, any]:
         'visible': review.visible
     }
 
+
 def get_all_media_reviews_with_genres():
-    reviews = db.session.query(MediaReview).options(joinedload(MediaReview.genres)).all()
+    reviews = db.session.query(MediaReview).options(
+        joinedload(MediaReview.genres)).all()
     result = []
 
     for review in reviews:
@@ -124,7 +214,8 @@ def get_all_media_reviews_with_genres():
 def create_new_media_review(media_review: MediaReview, genres: List[str]):
     try:
         # Check if a media review with the same name and media_type already exists
-        existing_review = MediaReview.query.filter_by(name=media_review.name, media_type=media_review.media_type).first()
+        existing_review = MediaReview.query.filter_by(
+            name=media_review.name, media_type=media_review.media_type).first()
         if existing_review:
             return jsonify({"error": f"A media review with the name '{existing_review.name}' and media_type '{existing_review.media_type}' already exists (id: {existing_review.id})"}), 409
 
@@ -141,7 +232,8 @@ def create_new_media_review(media_review: MediaReview, genres: List[str]):
                 db.session.add(genre)
                 db.session.commit()
 
-            media_review_genre = MediaReviewGenre(media_review_id=media_review.id, genre_id=genre.id)
+            media_review_genre = MediaReviewGenre(
+                media_review_id=media_review.id, genre_id=genre.id)
             db.session.add(media_review_genre)
 
         db.session.commit()
@@ -151,6 +243,7 @@ def create_new_media_review(media_review: MediaReview, genres: List[str]):
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "An error occurred while creating the media review"}), 500
+
 
 def update_media_review(media_review: MediaReview, genres: List[str]):
     try:
@@ -163,7 +256,7 @@ def update_media_review(media_review: MediaReview, genres: List[str]):
                     genre = Genre(name=genre_name)
                     db.session.add(genre)
                 new_genre_objs.append(genre)
-            
+
             # Update the media review's genres
             media_review.genres = new_genre_objs
 
@@ -180,6 +273,7 @@ def update_media_review(media_review: MediaReview, genres: List[str]):
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "An error occurred while updating the media review"}), 500
+
 
 def delete_media_review(media_review: MediaReview):
     # Delete the media review
@@ -211,7 +305,7 @@ def create_example_reviews_and_genres():
         genre5 = Genre(name='Science Fiction')
         genre6 = Genre(name='Romance')
 
-        db.session.add_all([genre1, genre2, genre3,genre4, genre5, genre6])
+        db.session.add_all([genre1, genre2, genre3, genre4, genre5, genre6])
         db.session.commit()
 
         # Create some example media reviews
@@ -323,11 +417,12 @@ def create_example_reviews_and_genres():
             genres=[genre2, genre5]
         )
 
-        db.session.add_all([review1, review2, review3, review4, review5, review6])
+        db.session.add_all(
+            [review1, review2, review3, review4, review5, review6])
         db.session.commit()
 
         print('Example reviews and genres created successfully.', file=sys.stderr)
 
     except IntegrityError:
         db.session.rollback()
-        print('Error: Could not create example reviews and genres. There might be a conflict with existing data.',file=sys.stderr)
+        print('Error: Could not create example reviews and genres. There might be a conflict with existing data.', file=sys.stderr)

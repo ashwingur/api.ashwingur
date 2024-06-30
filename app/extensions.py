@@ -10,6 +10,7 @@ from config import Config
 from flask_socketio import SocketIO, emit
 from redis import Redis
 from flask_migrate import Migrate
+from sqlalchemy.orm import scoped_session, sessionmaker
 import sys
 
 db = SQLAlchemy()
@@ -21,6 +22,8 @@ login_manager = LoginManager()
 migrate = Migrate()
 
 # Custom json resposne for the 401
+
+
 @login_manager.unauthorized_handler
 def unauthorised_handler():
     if request.method == 'GET':
@@ -28,14 +31,18 @@ def unauthorised_handler():
     else:
         return jsonify({"error": "You are unauthorised to perform this action"}), 401
 
+
 socketio = SocketIO()
 
 # Custom function to get the real IP address
+
+
 def get_real_ip():
     if request.headers.get('X-Forwarded-For'):
         # X-Forwarded-For can contain multiple IP addresses, we need the first one
         return request.headers.get('X-Forwarded-For').split(',')[0].strip()
     return request.remote_addr
+
 
 limiter = Limiter(
     # get_remote_address,
@@ -64,7 +71,8 @@ def roles_required(*roles):
 
 redis_client = Redis.from_url(Config.REDIS_URL)
 
-def socket_rate_limit(limit: int=15, window: int=60):
+
+def socket_rate_limit(limit: int = 15, window: int = 60):
     """
     Custom rate limiter for Socket.IO events.
 
@@ -79,7 +87,8 @@ def socket_rate_limit(limit: int=15, window: int=60):
             current = redis_client.get(key)
 
             if current and int(current) >= limit:
-                emit('rate_limit_exceeded', {'message': 'Rate limit exceeded. Try again later.'})
+                emit('rate_limit_exceeded', {
+                     'message': 'Rate limit exceeded. Try again later.'})
                 return
 
             if not current:
