@@ -9,6 +9,7 @@ from flask_login import LoginManager, current_user
 from config import Config
 from flask_socketio import SocketIO, emit
 from redis import Redis
+from flask_migrate import Migrate
 import sys
 
 db = SQLAlchemy()
@@ -16,6 +17,8 @@ db = SQLAlchemy()
 cors = CORS()
 
 login_manager = LoginManager()
+
+migrate = Migrate()
 
 # Custom json resposne for the 401
 @login_manager.unauthorized_handler

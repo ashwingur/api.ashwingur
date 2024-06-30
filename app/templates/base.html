@@ -23,7 +23,7 @@
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
-        color: white;
+        color: rgb(214, 214, 214);
       }
 
       .post {
@@ -50,9 +50,6 @@
   <body>
     <nav>
       <a href="{{ url_for('main.index') }}">api.ashwingur.com</a>
-      <!-- <a href="#">Posts</a>
-      <a href="#">Categories</a>
-      <a href="#">Questions</a> -->
     </nav>
     <hr />
     <div class="content">{% block content %} {% endblock %}</div>

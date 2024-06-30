@@ -12,3 +12,5 @@ pillow
 werkzeug
 python-dateutil
 requests
+Flask-Migrate
+python-dotenv

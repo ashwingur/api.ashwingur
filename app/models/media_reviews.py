@@ -3,12 +3,12 @@ import sys
 from typing import Dict, List
 
 from flask import Response, jsonify
-from sqlalchemy import ARRAY, Boolean, TIMESTAMP, func, inspect, text
+from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, func, inspect, text
 from zoneinfo import ZoneInfo
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.schema import CreateSchema
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, relationship
 
 
 SCHEMA = 'media_reviews_schema'
@@ -52,6 +52,32 @@ class MediaReview(db.Model):
 
     # Define relationship to Genre
     genres = db.relationship('Genre', secondary=f'{SCHEMA}.media_review_genre', back_populates='media_reviews')
+
+    # Define relationship to SubMediaReview
+    # sub_media_reviews = relationship('SubMediaReview', back_populates='media_review', cascade="all, delete-orphan")
+
+
+# class SubMediaReview(db.Model):
+#     __tablename__ = 'sub_media_reviews'
+#     __table_args__ = {'schema': SCHEMA}
+
+#     id = Column(Integer, primary_key=True)
+#     media_review_id = db.Column(Integer, ForeignKey(f'{SCHEMA}.media_reviews.id'), nullable=False)
+#     name = db.Column(String, nullable=False)
+#     review_creation_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
+#     review_last_update_date = db.Column(TIMESTAMP(timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
+#     cover_image = db.Column(String)
+#     rating = db.Column(Float)
+#     review_content = db.Column(Text)
+#     word_count = db.Column(Integer)
+#     run_time = db.Column(Integer)
+#     media_creation_date = db.Column(TIMESTAMP(timezone=True))
+#     consumed_date = db.Column(TIMESTAMP(timezone=True))
+#     pros = db.Column(ARRAY(String))
+#     cons = db.Column(ARRAY(String))
+
+#     media_review = relationship('MediaReview', back_populates='sub_media_reviews')
+
 
 
 class Genre(db.Model):
@@ -103,6 +129,7 @@ def create_new_media_review(media_review: MediaReview, genres: List[str]):
             return jsonify({"error": f"A media review with the name '{existing_review.name}' and media_type '{existing_review.media_type}' already exists (id: {existing_review.id})"}), 409
 
         media_review.review_creation_date = datetime.now(tz=ZoneInfo("UTC"))
+        media_review.review_last_update_date = media_review.review_creation_date
 
         db.session.add(media_review)
         db.session.commit()
