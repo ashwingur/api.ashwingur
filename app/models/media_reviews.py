@@ -55,8 +55,8 @@ class MediaReview(db.Model):
     creator = Column(String)
     media_creation_date = Column(TIMESTAMP(timezone=True))
     consumed_date = Column(TIMESTAMP(timezone=True))
-    pros = Column(ARRAY(String))
-    cons = Column(ARRAY(String))
+    pros = Column(ARRAY(String), nullable=False)
+    cons = Column(ARRAY(String), nullable=False)
     visible = Column(Boolean, default=True)
 
     # Define relationship to Genre
@@ -134,8 +134,8 @@ class SubMediaReview(db.Model):
     run_time = Column(Integer)
     media_creation_date = Column(TIMESTAMP(timezone=True))
     consumed_date = Column(TIMESTAMP(timezone=True))
-    pros = Column(ARRAY(String))
-    cons = Column(ARRAY(String))
+    pros = Column(ARRAY(String), nullable=False)
+    cons = Column(ARRAY(String), nullable=False)
 
     media_review = relationship(
         'MediaReview', back_populates='sub_media_reviews')
