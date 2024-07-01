@@ -164,56 +164,6 @@ class GenreSchema(SQLAlchemyAutoSchema):
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True, validate=validate.Length(min=1))
 
-# Define custom field for genre names
-
-
-# class GenreNamesField(fields.Field):
-#     def _serialize(self, value, attr, obj, **kwargs):
-#         if value is None:
-#             return []
-#         return [genre.name for genre in value]
-
-#     def _deserialize(self, value, attr, data, **kwargs):
-#         if not isinstance(value, list):
-#             raise ValidationError("Genres must be a list.")
-#         for item in value:
-#             if not isinstance(item, str) or not item.strip():
-#                 raise ValidationError("Each genre must be a non-empty string.")
-#         return value
-
-class GenreNameField(fields.List):
-    def __init__(self, cls_or_instance, **kwargs):
-        super().__init__(cls_or_instance, **kwargs)
-        self.validate = [self.ensure_list_of_strings]
-
-    def ensure_list_of_strings(self, value):
-        if not isinstance(value, list):
-            raise ValidationError("Field should be a list of strings")
-        for item in value:
-            if not isinstance(item, str) or not item.strip():
-                raise ValidationError("All items must be non-empty strings")
-
-    def _deserialize(self, value, attr, data, **kwargs):
-        if not isinstance(value, list):
-            raise ValidationError("Field should be a list of strings")
-        genres = []
-        for name in value:
-            if not isinstance(name, str) and not name:
-                raise ValidationError("Field should be non empty strings")
-
-            genre = db.session.query(Genre).filter_by(name=name).first()
-            if not genre:
-                genre = Genre(name=name)
-                db.session.add(genre)
-                # db.session.commit()
-            genres.append(genre)
-        return genres
-
-    def _serialize(self, value, attr, obj, **kwargs):
-        if not value:
-            return []
-        return [genre.name for genre in value]
-
 
 class MediaReviewSchema(SQLAlchemyAutoSchema):
     class Meta:
@@ -240,7 +190,9 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
     pros = fields.List(fields.Str(), validate=validate_non_empty_string_list)
     cons = fields.List(fields.Str(), validate=validate_non_empty_string_list)
     visible = fields.Bool(required=True)
-    genres = fields.Pluck(GenreSchema, 'name', many=True)
+    # genres = fields.Pluck(GenreSchema, 'name', many=True)
+    # genres = fields.Pluck(GenreSchema, 'name', many=True)
+    genres = fields.List(fields.Nested(GenreSchema))
 
     @pre_load
     def handle_null_fields(self, data, **kwargs):
@@ -248,8 +200,8 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
             data['pros'] = []
         if 'cons' not in data or data['cons'] is None:
             data['cons'] = []
-        if 'genres' not in data or data['genres'] is None:
-            data['genres'] = []
+        # if 'genres' not in data or data['genres'] is None:
+        #     data['genres'] = []
         if 'review_last_update_date' in data and data['review_last_update_date'] is None:
             del data['review_last_update_date']
         if 'review_creation_date' in data and data['review_creation_date'] is None:
