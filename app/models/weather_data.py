@@ -1,32 +1,26 @@
 from datetime import datetime, timedelta
 import random
 import sys
-from app.extensions import psycop_conn
+from app.extensions import psycop_conn, db
 from psycopg2 import sql
 from zoneinfo import ZoneInfo
-from sqlalchemy import text
+from sqlalchemy import CheckConstraint, text
+
+class SensorData(db.Model):
+    __tablename__ = 'sensor_data'
+    timestamp = db.Column(db.DateTime(timezone=True), primary_key=True, nullable=False)
+    temperature = db.Column(db.Float)
+    pressure = db.Column(db.Float)
+    humidity = db.Column(db.Float)
+    ambient_light = db.Column(db.Float)
+    air_quality_index = db.Column(db.SmallInteger, CheckConstraint('air_quality_index >= 1 AND air_quality_index <= 5'))
+    tvoc = db.Column(db.SmallInteger)
+    eco2 = db.Column(db.SmallInteger)
 
 # Create the sensor data table and convert it to a hypertable
 def setup_sensor_data_table():
     conn = psycop_conn()
     cur = conn.cursor()
-
-    # Create the data table if it does not exist
-    # create sensor data hypertable
-    query_create_sensordata_table = """
-    CREATE TABLE IF NOT EXISTS sensor_data (
-        timestamp TIMESTAMPTZ NOT NULL,
-        temperature FLOAT,
-        pressure FLOAT,
-        humidity FLOAT,
-        ambient_light FLOAT,
-        air_quality_index SMALLINT CHECK (air_quality_index >= 1 AND air_quality_index <= 5),
-        TVOC SMALLINT,
-        eCO2 SMALLINT
-    );
-    """
-
-    cur.execute(query_create_sensordata_table)
 
     # Convert the table to a hypertable if it is not already one
     create_hypertable_query = """
