@@ -68,8 +68,38 @@ class MediaReview(db.Model):
         'SubMediaReview', back_populates='media_review', cascade="all, delete-orphan")
 
     def insert(self):
-        for genre_name in self.genres:
-            pass
+        if self.id:
+            return jsonify({"error": "The 'id' field must be null if provided when creating a new MediaReview"}), 400
+
+        # Check if the MediaReview already exists with the same name for the given media_review
+        existing_review = MediaReview.query.filter_by(
+            name=self.name).first()
+        if existing_review:
+            return jsonify({"error": f"Media with the name '{self.name}' already exists"}), 409
+
+        try:
+            # Fetch or create genres based on provided data
+            genres: List[Genre] = self.genres
+            processed_genres = []
+            for genre in genres:
+                existing_genre = Genre.query.filter_by(name=genre.name).first()
+                if existing_genre:
+                    processed_genres.append(existing_genre)
+                if not existing_genre:
+                    new_genre = Genre(name=genre.name)
+                    db.session.add(new_genre)
+                    db.session.flush()  # Ensures new_genre gets an ID
+                    processed_genres.append(new_genre)
+
+            self.genres = processed_genres
+
+            db.session.add(self)
+            db.session.commit()
+            result = media_review_schema.dump(self)
+            return jsonify(result), 201
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"error": "An error occurred while creating the media review"}), 500
 
 
 class Genre(db.Model):
@@ -187,24 +217,18 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
     creator = fields.Str(allow_none=True)
     media_creation_date = fields.DateTime(allow_none=True)
     consumed_date = fields.DateTime(allow_none=True)
-    pros = fields.List(fields.Str(), validate=validate_non_empty_string_list)
-    cons = fields.List(fields.Str(), validate=validate_non_empty_string_list)
+    pros = fields.List(
+        fields.Str(), validate=validate_non_empty_string_list, required=True)
+    cons = fields.List(
+        fields.Str(), validate=validate_non_empty_string_list, required=True)
     visible = fields.Bool(required=True)
-    # genres = fields.Pluck(GenreSchema, 'name', many=True)
-    # genres = fields.Pluck(GenreSchema, 'name', many=True)
-    genres = fields.List(fields.Nested(GenreSchema))
+    genres = fields.List(fields.Nested(GenreSchema), required=True)
 
     @pre_load
     def handle_null_fields(self, data, **kwargs):
-        if 'pros' not in data or data['pros'] is None:
-            data['pros'] = []
-        if 'cons' not in data or data['cons'] is None:
-            data['cons'] = []
-        # if 'genres' not in data or data['genres'] is None:
-        #     data['genres'] = []
-        if 'review_last_update_date' in data and data['review_last_update_date'] is None:
+        if 'review_last_update_date' in data:
             del data['review_last_update_date']
-        if 'review_creation_date' in data and data['review_creation_date'] is None:
+        if 'review_creation_date' in data:
             del data['review_creation_date']
         return data
 
@@ -237,6 +261,7 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
 sub_media_review_schema = SubMediaReviewSchema()
 media_review_schema = MediaReviewSchema()
 media_reviews_list_schema = MediaReviewSchema(many=True)
+genre_list_schema = GenreSchema(many=True)
 
 
 def media_review_to_response_item(review: MediaReview) -> Dict[str, any]:

@@ -5,7 +5,7 @@ from flask_login import login_required
 from marshmallow import ValidationError
 from app.mediareviews import bp
 from flask import jsonify, request
-from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema
+from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
 from app.models.media_reviews import get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
@@ -78,43 +78,20 @@ def get_review():
 def create_review():
     json_data = request.get_json()
 
+    # Check if 'id' is present and has a value, if it's null we delete it and let it pass
     if 'id' in json_data:
+        if json_data['id'] is not None:
+            return jsonify({"error": "The 'id' field must be null if provided when creating a new MediaReview"}), 400
         json_data.pop('id')
 
-    print(f'json data: {json_data}', file=sys.stderr)
-
     # Extract genres from json_data and remove it from the main data
-
     try:
         media_review: MediaReview = media_review_schema.load(json_data)
     except ValidationError as err:
         return jsonify({"error": f"Issue with provided fields: {err.messages}"}), 422
 
-    # Check if the MediaReview already exists with the same name for the given media_review
-    existing_review = MediaReview.query.filter_by(
-        name=media_review.name).first()
-    if existing_review:
-        return jsonify({"error": f"Media with the name '{media_review.name}' already exists"}), 409
-
-    # Fetch or create genres based on provided data
-    genres: List[Genre] = media_review.genres
-    processed_genres = []
-    for genre in genres:
-        existing_genre = Genre.query.filter_by(name=genre.name).first()
-        if existing_genre:
-            processed_genres.append(existing_genre)
-        if not existing_genre:
-            new_genre = Genre(name=genre.name)
-            db.session.add(new_genre)
-            db.session.flush()  # Ensures new_genre gets an ID
-            processed_genres.append(new_genre)
-
-    media_review.genres = processed_genres
-
-    db.session.add(media_review)
-    db.session.commit()
-    result = media_review_schema.dump(media_review)
-    return jsonify(result), 201
+    response = media_review.insert()
+    return response
 
 
 @bp.route('/<int:review_id>', methods=['PUT'])
@@ -122,43 +99,66 @@ def create_review():
 @login_required
 @roles_required('admin')
 def update_review(review_id):
-    data = request.json
+    json_data = request.get_json()
 
-    # Retrieve the media review by ID
-    media_review = MediaReview.query.get(review_id)
-    if not media_review:
-        return jsonify({"error": f"Media review with id '{review_id}' not found"}), 404
+    # Check for existing review
+    existing_review = MediaReview.query.get(review_id)
+    if not existing_review:
+        return jsonify({"error": "MediaReview not found"}), 404
 
-    # Check if values are valid
-    invalid_response = validate_media_review(data)
-    if invalid_response:
-        return invalid_response
+    # Temporarily remove genres from json_data to avoid premature processing
+    genres_data = json_data.pop('genres', [])
 
-    # Update the media review fields
-    media_review.name = data.get('name', media_review.name)
-    media_review.media_type = data.get('media_type', media_review.media_type)
-    media_review.cover_image = data.get(
-        'cover_image', media_review.cover_image)
-    media_review.rating = data.get('rating', media_review.rating)
-    media_review.review_content = data.get(
-        'review_content', media_review.review_content)
-    media_review.word_count = data.get('word_count', media_review.word_count)
-    media_review.run_time = data.get('run_time', media_review.run_time)
-    media_review.creator = data.get('creator', media_review.creator)
-    media_review.media_creation_date = data.get(
-        'media_creation_date', media_review.media_creation_date)
-    media_review.consumed_date = data.get(
-        'consumed_date', media_review.consumed_date)
-    media_review.pros = data.get('pros', media_review.pros)
-    media_review.cons = data.get('cons', media_review.cons)
-    media_review.visible = data.get('visible', media_review.visible)
-    media_review.review_last_update_date = datetime.now(tz=ZoneInfo("UTC"))
+    # Validate genres separately
+    try:
+        genre_list_schema.load(genres_data)
+    except ValidationError as err:
+        return jsonify({"error": f"Issue with provided genres: {err.messages}"}), 422
 
-    new_genres = data.get('genres', [])
+    # Parse input data without genres
+    try:
+        media_review: MediaReview = media_review_schema.load(
+            json_data, partial=True, instance=existing_review)
+    except ValidationError as err:
+        return jsonify({"error": f"Issue with provided fields: {err.messages}"}), 422
 
-    response = update_media_review(media_review, new_genres)
+    # Process genres separately
+    genre_names = [genre['name'] for genre in genres_data]
+    existing_genres = Genre.query.filter(Genre.name.in_(genre_names)).all()
 
-    return response
+    processed_genres = []
+    # with db.session.no_autoflush:
+    for genre_name in genre_names:
+        existing_genre = next(
+            (g for g in existing_genres if g.name == genre_name), None)
+        if existing_genre:
+            processed_genres.append(existing_genre)
+        else:
+            new_genre = Genre(name=genre_name)
+            db.session.add(new_genre)
+            db.session.flush()  # Ensures new_genre gets an ID
+            processed_genres.append(new_genre)
+
+    # Assign processed genres to the media review
+    media_review.genres = processed_genres
+
+    # Delete orphaned genres
+    all_genres = Genre.query.all()
+    for genre in all_genres:
+        if not genre.media_reviews:
+            db.session.delete(genre)
+
+    # Commit changes
+    try:
+        db.session.commit()
+    except IntegrityError as e:
+        db.session.rollback()
+        if "duplicate key value violates unique constraint" in str(e.orig):
+            return jsonify({"error": "A genre with the same name already exists."}), 409
+        return jsonify({"error": f"Error updating the review: {str(e)}"}), 500
+
+    # Return updated review
+    return jsonify(media_review_schema.dump(media_review)), 200
 
 
 @bp.route('/<int:review_id>', methods=['DELETE'])
