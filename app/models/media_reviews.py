@@ -247,7 +247,8 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         fields.Str(), validate=validate_non_empty_string_list, required=True)
     visible = fields.Bool(required=True)
     genres = fields.List(fields.Nested(GenreSchema), required=True)
-    sub_reviews = fields.List(fields.Nested(SubMediaReview), dump_only=True)
+    sub_media_reviews = fields.List(fields.Nested(
+        SubMediaReviewSchema), dump_only=True)
 
     @pre_load
     def handle_null_fields(self, data, **kwargs):
