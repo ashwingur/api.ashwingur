@@ -3,7 +3,7 @@ import sys
 from typing import Dict, List
 
 from flask import jsonify
-from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func, inspect, text
+from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, func, inspect
 from zoneinfo import ZoneInfo
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
@@ -11,7 +11,6 @@ from sqlalchemy.schema import CreateSchema
 from sqlalchemy.orm import joinedload, relationship
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from marshmallow import fields, pre_load, validate
-from app.custom_validators import validate_non_empty_string_list
 
 SCHEMA = 'media_reviews_schema'
 
@@ -242,9 +241,9 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
     media_creation_date = fields.DateTime(allow_none=True)
     consumed_date = fields.DateTime(allow_none=True)
     pros = fields.List(
-        fields.Str(), validate=validate_non_empty_string_list, required=True)
+        fields.Str(), required=True)
     cons = fields.List(
-        fields.Str(), validate=validate_non_empty_string_list, required=True)
+        fields.Str(), required=True)
     visible = fields.Bool(required=True)
     genres = fields.List(fields.Nested(GenreSchema), required=True)
     sub_media_reviews = fields.List(fields.Nested(
