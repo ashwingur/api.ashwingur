@@ -82,7 +82,6 @@ def update_review(review_id):
     existing_genres = Genre.query.filter(Genre.name.in_(genre_names)).all()
 
     processed_genres = []
-    # with db.session.no_autoflush:
     for genre_name in genre_names:
         existing_genre = next(
             (g for g in existing_genres if g.name == genre_name), None)
@@ -127,6 +126,12 @@ def delete_review(review_id):
 
     try:
         db.session.delete(media_review)
+
+        # Delete orphaned genres
+        all_genres = Genre.query.all()
+        for genre in all_genres:
+            if not genre.media_reviews:
+                db.session.delete(genre)
         db.session.commit()
         return '', 204
     except IntegrityError:
