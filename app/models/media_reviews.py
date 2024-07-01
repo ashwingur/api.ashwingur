@@ -2,15 +2,15 @@ from datetime import datetime
 import sys
 from typing import Dict, List
 
-from flask import Response, jsonify
+from flask import jsonify
 from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func, inspect, text
 from zoneinfo import ZoneInfo
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy.orm import joinedload, relationship
-from marshmallow_sqlalchemy import SQLAlchemyAutoSchema, auto_field
-from marshmallow import fields, post_load, pre_load, validates_schema, ValidationError, validate
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from marshmallow import fields, pre_load, validate
 from app.custom_validators import validate_non_empty_string_list
 
 SCHEMA = 'media_reviews_schema'
