@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 @limiter.limit('20/minute', override_defaults=True)
 def get_review():
     # Query all media reviews from the database
-    media_reviews = MediaReview.query.all()
+    media_reviews = MediaReview.query.order_by(MediaReview.name.asc()).all()
 
     # Serialize the media reviews
     media_reviews_data = media_reviews_list_schema.dump(media_reviews)
@@ -55,6 +55,11 @@ def create_review():
 @roles_required('admin')
 def update_review(review_id):
     json_data = request.get_json()
+
+    if 'id' in json_data:
+        if json_data['id'] != review_id:
+            return jsonify({"error": "The 'id' field in the body does not match the id field in the url"}), 400
+        json_data.pop('id')
 
     # Check for existing review
     existing_review = MediaReview.query.get(review_id)

@@ -156,16 +156,16 @@ class SubMediaReview(db.Model):
         if existing_review:
             return jsonify({"error": f"SubMediaReview with the name '{name}' already exists for the given media review"}), 409
 
-        try:
-            db.session.add(self)
-            db.session.commit()
+        db.session.add(self)
+        db.session.commit()
 
+        try:
             # Serialize the new SubMediaReview instance
             result = sub_media_review_schema.dump(self)
             return jsonify(result), 201
         except IntegrityError:
             db.session.rollback()
-            return jsonify({"error": "An error occurred while creating the media review"}), 500
+            return jsonify({"error": "An error occurred while creating the sub media review"}), 500
 
     def update(self):
         # Check if one with the same name already exists
@@ -193,6 +193,30 @@ class GenreSchema(SQLAlchemyAutoSchema):
 
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True, validate=validate.Length(min=1))
+
+
+class SubMediaReviewSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = SubMediaReview
+        load_instance = True
+        include_fk = True
+        sqla_session = db.session
+
+    id = fields.Int(dump_only=True)
+    media_review_id = fields.Int(required=True, validate=validate.Range(min=1))
+    display_index = fields.Int(required=True, validate=validate.Range(min=0))
+    name = fields.Str(required=True, validate=validate.Length(min=1))
+    review_creation_date = fields.DateTime(dump_only=True)
+    review_last_update_date = fields.DateTime(dump_only=True)
+    cover_image = fields.Str()
+    rating = fields.Float(validate=validate.Range(min=0.0, max=10.0))
+    review_content = fields.Str()
+    word_count = fields.Int(validate=validate.Range(min=0))
+    run_time = fields.Int(validate=validate.Range(min=0))
+    media_creation_date = fields.DateTime()
+    consumed_date = fields.DateTime()
+    pros = fields.List(fields.Str(), required=True)
+    cons = fields.List(fields.Str(), required=True)
 
 
 class MediaReviewSchema(SQLAlchemyAutoSchema):
@@ -223,6 +247,7 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         fields.Str(), validate=validate_non_empty_string_list, required=True)
     visible = fields.Bool(required=True)
     genres = fields.List(fields.Nested(GenreSchema), required=True)
+    sub_reviews = fields.List(fields.Nested(SubMediaReview), dump_only=True)
 
     @pre_load
     def handle_null_fields(self, data, **kwargs):
@@ -231,30 +256,6 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         if 'review_creation_date' in data:
             del data['review_creation_date']
         return data
-
-
-class SubMediaReviewSchema(SQLAlchemyAutoSchema):
-    class Meta:
-        model = SubMediaReview
-        load_instance = True
-        include_fk = True
-        sqla_session = db.session
-
-    id = fields.Int(dump_only=True)
-    media_review_id = fields.Int(required=True, validate=validate.Range(min=1))
-    display_index = fields.Int(required=True, validate=validate.Range(min=0))
-    name = fields.Str(required=True, validate=validate.Length(min=1))
-    review_creation_date = fields.DateTime(dump_only=True)
-    review_last_update_date = fields.DateTime(dump_only=True)
-    cover_image = fields.Str()
-    rating = fields.Float(validate=validate.Range(min=0.0, max=10.0))
-    review_content = fields.Str()
-    word_count = fields.Int(validate=validate.Range(min=0))
-    run_time = fields.Int(validate=validate.Range(min=0))
-    media_creation_date = fields.DateTime()
-    consumed_date = fields.DateTime()
-    pros = fields.List(fields.Str(), validate=validate_non_empty_string_list)
-    cons = fields.List(fields.Str(), validate=validate_non_empty_string_list)
 
 
 # Instantiate the schema
