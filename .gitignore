@@ -1,6 +1,9 @@
 *.backup
 docker-compose.override.yml
 
+# Ignore everything in the migrations folder
+migrations/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
