@@ -135,6 +135,7 @@ class SubMediaReview(db.Model):
     consumed_date = Column(TIMESTAMP(timezone=True))
     pros = Column(ARRAY(String), nullable=False)
     cons = Column(ARRAY(String), nullable=False)
+    visible = Column(Boolean, default=True)
 
     media_review = relationship(
         'MediaReview', back_populates='sub_media_reviews')
@@ -207,15 +208,17 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
     name = fields.Str(required=True, validate=validate.Length(min=1))
     review_creation_date = fields.DateTime(dump_only=True)
     review_last_update_date = fields.DateTime(dump_only=True)
-    cover_image = fields.Str()
-    rating = fields.Float(validate=validate.Range(min=0.0, max=10.0))
-    review_content = fields.Str()
-    word_count = fields.Int(validate=validate.Range(min=0))
-    run_time = fields.Int(validate=validate.Range(min=0))
-    media_creation_date = fields.DateTime()
-    consumed_date = fields.DateTime()
+    cover_image = fields.Str(allow_none=True)
+    rating = fields.Float(validate=validate.Range(
+        min=0.0, max=10.0), allow_none=True)
+    review_content = fields.Str(allow_none=True)
+    word_count = fields.Int(validate=validate.Range(min=0), allow_none=True)
+    run_time = fields.Int(validate=validate.Range(min=0), allow_none=True)
+    media_creation_date = fields.DateTime(allow_none=True)
+    consumed_date = fields.DateTime(allow_none=True)
     pros = fields.List(fields.Str(), required=True)
     cons = fields.List(fields.Str(), required=True)
+    visible = fields.Bool(required=True)
 
 
 class MediaReviewSchema(SQLAlchemyAutoSchema):
