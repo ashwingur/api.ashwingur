@@ -43,9 +43,9 @@ class MediaReview(db.Model):
     name = Column(String, nullable=False)
     media_type = Column(String, nullable=False)
     review_creation_date = Column(TIMESTAMP(
-        timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
-    review_last_update_date = Column(TIMESTAMP(timezone=True), default=datetime.now(
-        tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
+        timezone=True), default=func.now(), nullable=False)
+    review_last_update_date = Column(TIMESTAMP(
+        timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     cover_image = Column(String)
     rating = Column(Float)
     review_content = Column(Text)
@@ -123,9 +123,9 @@ class SubMediaReview(db.Model):
     display_index = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
     review_creation_date = Column(TIMESTAMP(
-        timezone=True), default=datetime.now(tz=ZoneInfo("UTC")), nullable=False)
-    review_last_update_date = Column(TIMESTAMP(timezone=True), default=datetime.now(
-        tz=ZoneInfo("UTC")), onupdate=func.now(), nullable=False)
+        timezone=True), default=func.now(), nullable=False)
+    review_last_update_date = Column(TIMESTAMP(
+        timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     cover_image = Column(String)
     rating = Column(Float)
     review_content = Column(Text)
