@@ -39,3 +39,7 @@ api.ashwingur.com {
     #     format console
     # }
 }
+
+imgproxy.ashwingur.com {
+    reverse_proxy imgproxy:8080
+}
