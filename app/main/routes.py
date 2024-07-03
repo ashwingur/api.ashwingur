@@ -1,5 +1,7 @@
 from datetime import datetime
+import sys
 from flask import app, render_template, request, jsonify
+import requests
 from app.main import bp
 from app.extensions import limiter, login_manager, db
 from flask_login import login_user, logout_user, login_required, current_user
@@ -11,52 +13,90 @@ from zoneinfo import ZoneInfo
 
 POSSIBLE_ROLES = ['user', 'admin']
 
+
 @bp.route('/')
 def index():
     return render_template('index.html')
 
-@bp.route('/ip')
+
+@bp.route('/imagetest')
+def image_test():
+    # https://github.com/imgproxy/imgproxy/blob/master/examples/signature.py
+    import base64
+    import hashlib
+    import hmac
+    from config import Config
+
+    key = bytes.fromhex(Config.IMGPROXY_KEY)
+    salt = bytes.fromhex(Config.IMGPROXY_SALT)
+
+    path = "/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg".encode()
+    # path = "/rs:fit:300:300/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg".encode()
+
+    digest = hmac.new(key, msg=salt+path, digestmod=hashlib.sha256).digest()
+    signature = base64.urlsafe_b64encode(digest).rstrip(b"=")
+
+    url = b'/%s%s' % (
+        signature,
+        path,
+    )
+
+    print(f'{url}', file=sys.stderr)
+
+    if Config.FLASK_ENV == "DEV":
+        base_url = "http://localhost:8080"
+    else:
+        base_url = "https://api.ashwingur.com:8080"
+
+    return base_url + url.decode()
+
+
+@ bp.route('/ip')
 def ip():
     ip = get_real_ip()
     return f"<h1>Your IP: {ip}</h1>"
 
-@login_manager.user_loader
+
+@ login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-@bp.route('/users', methods=['GET', 'POST', 'DELETE'])
-@limiter.limit("30/minute", override_defaults=True)
-@login_required
-@roles_required('admin')
+
+@ bp.route('/users', methods=['GET', 'POST', 'DELETE'])
+@ limiter.limit("30/minute", override_defaults=True)
+@ login_required
+@ roles_required('admin')
 def users():
     if request.method == 'GET':
         # Return all users from the database with all data except password
         users: list[User] = User.query.all()
-        user_list = [{'id': user.id, 'username': user.username, 'role': user.role, 'date_registered': user.date_registered, 'last_login': user.last_login_timestamp} for user in users]
+        user_list = [{'id': user.id, 'username': user.username, 'role': user.role,
+                      'date_registered': user.date_registered, 'last_login': user.last_login_timestamp} for user in users]
         return jsonify(user_list), 200
-    
+
     elif request.method == 'POST':
         # Create a new user. The signup provides username, password and role
         data = request.json
         username = data.get('username')
         password = data.get('password')
-        role = data.get('role')  # Assuming role is provided in the request body
+        # Assuming role is provided in the request body
+        role = data.get('role')
 
         if not username or not password or not role:
             return jsonify({'message': 'Username, password, and role are required'}), 400
         if role not in POSSIBLE_ROLES:
             return jsonify({'message': f"'{role}' is not a valid role"}), 400
 
-
         if User.query.filter_by(username=username).first():
             return jsonify({'message': 'Username already exists'}), 409
 
-        new_user = User(username=username, password=generate_password_hash(password), role=role)
+        new_user = User(username=username,
+                        password=generate_password_hash(password), role=role)
         db.session.add(new_user)
         db.session.commit()
 
         return jsonify({'message': 'User created successfully', 'username': username}), 201
-    
+
     elif request.method == 'DELETE':
         # Delete a user by ID
         data = request.json
@@ -73,7 +113,7 @@ def users():
         # Ensure admin cannot delete themselves
         if user_to_delete == current_user:
             return jsonify({'message': 'Admin cannot delete themselves'}), 403
-        
+
         deleted_username = user_to_delete.username
 
         db.session.delete(user_to_delete)
@@ -81,8 +121,9 @@ def users():
 
         return jsonify({'message': f"User '{deleted_username}' deleted successfully"}), 200
 
-@bp.route('/login', methods=['POST'])
-@limiter.limit("10/minute", override_defaults=False)
+
+@ bp.route('/login', methods=['POST'])
+@ limiter.limit("10/minute", override_defaults=False)
 def login():
     data = request.json
     username = data.get('username')
@@ -93,35 +134,41 @@ def login():
         login_user(user, remember=True)
         user.last_login_timestamp = datetime.now(ZoneInfo("UTC"))
         db.session.commit()
-        response = jsonify({'authenticated': True, 'username': user.username, 'role': user.role})
-        
+        response = jsonify(
+            {'authenticated': True, 'username': user.username, 'role': user.role})
+
         return response, 200
 
     return jsonify({'message': 'Invalid credentials', 'authenticated': False}), 401
 
-@bp.route('/logout', methods=['POST'])
-@login_required
+
+@ bp.route('/logout', methods=['POST'])
+@ login_required
 def logout():
     logout_user()
     return jsonify({'message': 'Logout successful'}), 200
 
-@bp.route('/checkauth', methods=['GET'])
-@limiter.exempt
+
+@ bp.route('/checkauth', methods=['GET'])
+@ limiter.exempt
 def check_auth():
     if current_user.is_authenticated:
         return jsonify({'authenticated': True, 'id': current_user.id, 'username': current_user.username, 'role': current_user.role})
     else:
         return jsonify({'authenticated': False})
 
-### TEST
-@bp.route('/admin_test', methods=['GET'])
-@login_required
-@roles_required('admin')
+# TEST
+
+
+@ bp.route('/admin_test', methods=['GET'])
+@ login_required
+@ roles_required('admin')
 def admin_dashboard():
     return jsonify({'message': 'Welcome to the admin dashboard', 'username': current_user.username})
 
-@bp.route('/user_test', methods=['GET'])
-@login_required
-@roles_required('user', 'admin')
+
+@ bp.route('/user_test', methods=['GET'])
+@ login_required
+@ roles_required('user', 'admin')
 def user_dashboard():
     return jsonify({'message': 'Welcome to the user dashboard', 'username': current_user.username})
