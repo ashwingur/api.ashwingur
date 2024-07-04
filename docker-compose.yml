@@ -64,6 +64,8 @@ services:
       - IMGPROXY_ENABLE_WEBP_DETECTION="true"
       - IMGPROXY_KEY=${IMGPROXY_KEY}
       - IMGPROXY_SALT=${IMGPROXY_SALT}
+    networks:
+      - app_network
 
 volumes:
   pgdata: {}

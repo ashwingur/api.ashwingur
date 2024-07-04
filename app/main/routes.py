@@ -30,7 +30,7 @@ def image_test():
     key = bytes.fromhex(Config.IMGPROXY_KEY)
     salt = bytes.fromhex(Config.IMGPROXY_SALT)
 
-    path = "/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg".encode()
+    path = "/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg@webp".encode()
     # path = "/rs:fit:300:300/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg".encode()
 
     digest = hmac.new(key, msg=salt+path, digestmod=hashlib.sha256).digest()
@@ -46,7 +46,7 @@ def image_test():
     if Config.FLASK_ENV == "DEV":
         base_url = "http://localhost:8080"
     else:
-        base_url = "https://api.ashwingur.com:8080"
+        base_url = "https://imgproxy.ashwingur.com"
 
     return base_url + url.decode()
 
