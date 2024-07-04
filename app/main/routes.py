@@ -8,7 +8,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app.models.user import User
 from app.extensions import roles_required, get_real_ip
 from werkzeug.security import generate_password_hash, check_password_hash
-
+from app.image_proxy import ImageProxy
 from zoneinfo import ZoneInfo
 
 POSSIBLE_ROLES = ['user', 'admin']
@@ -21,34 +21,7 @@ def index():
 
 @bp.route('/imagetest')
 def image_test():
-    # https://github.com/imgproxy/imgproxy/blob/master/examples/signature.py
-    import base64
-    import hashlib
-    import hmac
-    from config import Config
-
-    key = bytes.fromhex(Config.IMGPROXY_KEY)
-    salt = bytes.fromhex(Config.IMGPROXY_SALT)
-
-    path = "/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg@webp".encode()
-    # path = "/rs:fit:300:300/plain/https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg".encode()
-
-    digest = hmac.new(key, msg=salt+path, digestmod=hashlib.sha256).digest()
-    signature = base64.urlsafe_b64encode(digest).rstrip(b"=")
-
-    url = b'/%s%s' % (
-        signature,
-        path,
-    )
-
-    print(f'{url}', file=sys.stderr)
-
-    if Config.FLASK_ENV == "DEV":
-        base_url = "http://localhost:8080"
-    else:
-        base_url = "https://imgproxy.ashwingur.com"
-
-    return base_url + url.decode()
+    return ImageProxy.sign_image_url("https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg", use_webp=True)
 
 
 @ bp.route('/ip')

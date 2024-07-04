@@ -1,19 +1,20 @@
-from flask import Flask, jsonify, request
 import os
-from config import Config
-from app.extensions import db, limiter, cors, login_manager, socketio, migrate
+
+from flask import Flask, jsonify, request
+
+from app.extensions import cors, db, limiter, login_manager, migrate, socketio
 from app.middleware import register_middlewares
-
-
-# Import DB models so they're within context
+# Ensure the models are imported so its registered
+from app.models.frontend_log import FrontendLog
+from app.models.media_reviews import (Genre, MediaReview, MediaReviewGenre,
+                                      SubMediaReview,
+                                      create_example_reviews_and_genres,
+                                      initialise_media_reviews)
+from app.models.post import Post
+from app.models.request_log import RequestLog
 from app.models.user import create_admin_user
 from app.models.weather_data import SensorData
-from app.models.request_log import RequestLog
-# Ensure the model is imported so its registered
-from app.models.frontend_log import FrontendLog
-from app.models.media_reviews import MediaReviewGenre, MediaReview, Genre, SubMediaReview
-from app.models.media_reviews import initialise_media_reviews, create_example_reviews_and_genres
-from app.models.post import Post
+from config import Config
 
 
 def create_app(config_class=Config):

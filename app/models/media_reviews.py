@@ -1,23 +1,27 @@
-from datetime import datetime
 import sys
+from datetime import datetime
 from typing import Dict, List
+from zoneinfo import ZoneInfo
 
 from flask import jsonify
-from sqlalchemy import ARRAY, Boolean, TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, func, inspect
-from zoneinfo import ZoneInfo
-from app.extensions import db
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.schema import CreateSchema
-from sqlalchemy.orm import joinedload, relationship
-from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from marshmallow import fields, pre_load, validate
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from sqlalchemy import (ARRAY, TIMESTAMP, Boolean, Column, Float, ForeignKey,
+                        Integer, String, Text, func, inspect)
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload, relationship
+from sqlalchemy.schema import CreateSchema
+
+from app.extensions import db
+from app.image_proxy import ImageProxy
 
 SCHEMA = 'media_reviews_schema'
 
-# Association table for the many-to-many relationship between MediaReview and Genre
-
 
 class MediaReviewGenre(db.Model):
+    """
+        Association table for the many-to-many relationship between MediaReview and Genre
+    """
     __tablename__ = 'media_review_genre'
     __table_args__ = {'schema': SCHEMA}
 
@@ -220,6 +224,14 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
     cons = fields.List(fields.Str(), required=True)
     visible = fields.Bool(required=True)
 
+    signed_cover_image = fields.Method(
+        "get_signed_cover_image", dump_only=True)
+
+    def get_signed_cover_image(self, obj):
+        if obj.cover_image:
+            return ImageProxy.sign_image_url(obj.cover_image, use_webp=True)
+        return None
+
 
 class MediaReviewSchema(SQLAlchemyAutoSchema):
     class Meta:
@@ -251,6 +263,13 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
     genres = fields.List(fields.Nested(GenreSchema), required=True)
     sub_media_reviews = fields.List(fields.Nested(
         SubMediaReviewSchema), dump_only=True)
+    signed_cover_image = fields.Method(
+        "get_signed_cover_image", dump_only=True)
+
+    def get_signed_cover_image(self, obj):
+        if obj.cover_image:
+            return ImageProxy.sign_image_url(obj.cover_image, use_webp=True)
+        return None
 
     @pre_load
     def handle_null_fields(self, data, **kwargs):
