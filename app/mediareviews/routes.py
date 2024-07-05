@@ -16,6 +16,9 @@ from sqlalchemy.exc import IntegrityError
 @bp.route('', methods=['GET'])
 @limiter.limit('20/minute', override_defaults=True)
 def get_review():
+    """
+        Gets a list of all MediaReview items
+    """
     # Query all media reviews from the database
     media_reviews = MediaReview.query.order_by(MediaReview.name.asc()).all()
 
@@ -24,6 +27,36 @@ def get_review():
 
     # Return the serialized data as a JSON response
     return jsonify(media_reviews_data)
+
+
+@bp.route('/paginated', methods=['GET'])
+@limiter.limit('20/minute', override_defaults=True)
+def get_paginated_reviews():
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    query = MediaReview.query
+
+    # apply filtering...
+
+    # Order the results and apply pagination
+    paginated_reviews = query.order_by(MediaReview.name.asc()).paginate(
+        page=page, per_page=per_page, max_per_page=30, error_out=False)
+
+    media_reviews_data = media_reviews_list_schema.dump(
+        paginated_reviews.items)
+
+    response = {
+        'total': paginated_reviews.total,
+        'pages': paginated_reviews.pages,
+        'current_page': paginated_reviews.page,
+        'per_page': paginated_reviews.per_page,
+        'has_next': paginated_reviews.has_next,
+        'media_reviews': media_reviews_data
+    }
+
+    return jsonify(response)
 
 
 @bp.route('', methods=['POST'])
