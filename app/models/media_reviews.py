@@ -1,10 +1,11 @@
+import re
 import sys
 from datetime import datetime
 from typing import Dict, List
 from zoneinfo import ZoneInfo
 
 from flask import jsonify
-from marshmallow import fields, pre_load, validate
+from marshmallow import ValidationError, fields, pre_load, validate, validates
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from sqlalchemy import (ARRAY, TIMESTAMP, Boolean, Column, Float, ForeignKey,
                         Integer, String, Text, func, inspect)
@@ -51,6 +52,7 @@ class MediaReview(db.Model):
     review_last_update_date = Column(TIMESTAMP(
         timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     cover_image = Column(String)
+    cover_image_bg_colour = Column(String, nullable=True)
     rating = Column(Float)
     review_content = Column(Text)
     word_count = Column(Integer)
@@ -131,6 +133,7 @@ class SubMediaReview(db.Model):
     review_last_update_date = Column(TIMESTAMP(
         timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     cover_image = Column(String)
+    cover_image_bg_colour = Column(String, nullable=True)
     rating = Column(Float)
     review_content = Column(Text)
     word_count = Column(Integer)
@@ -213,6 +216,7 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
     review_creation_date = fields.DateTime(dump_only=True)
     review_last_update_date = fields.DateTime(dump_only=True)
     cover_image = fields.Str(allow_none=True)
+    cover_image_bg_colour = fields.Str(allow_none=True)
     rating = fields.Float(validate=validate.Range(
         min=0.0, max=10.0), allow_none=True)
     review_content = fields.Str(allow_none=True)
@@ -232,6 +236,12 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
             return ImageProxy.sign_image_url(obj.cover_image, use_webp=True)
         return None
 
+    @validates("cover_image_bg_colour")
+    def validate_cover_image_bg_colour(self, value):
+        hex_color_regex = r'^#[A-Fa-f0-9]{6}$'
+        if not re.match(hex_color_regex, value):
+            raise ValidationError(f"'{value}' is not a valid HEX colour")
+
 
 class MediaReviewSchema(SQLAlchemyAutoSchema):
     class Meta:
@@ -247,6 +257,7 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
     review_creation_date = fields.DateTime(dump_only=True)
     review_last_update_date = fields.DateTime(dump_only=True)
     cover_image = fields.Str(allow_none=True)
+    cover_image_bg_colour = fields.Str(allow_none=True)
     rating = fields.Float(validate=validate.Range(
         min=0.0, max=10.0), allow_none=True)
     review_content = fields.Str(allow_none=True)
@@ -270,6 +281,12 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         if obj.cover_image:
             return ImageProxy.sign_image_url(obj.cover_image, use_webp=True)
         return None
+
+    @validates("cover_image_bg_colour")
+    def validate_cover_image_bg_colour(self, value):
+        hex_color_regex = r'^#[A-Fa-f0-9]{6}$'
+        if not re.match(hex_color_regex, value):
+            raise ValidationError(f"'{value}' is not a valid HEX colour")
 
     @pre_load
     def handle_null_fields(self, data, **kwargs):

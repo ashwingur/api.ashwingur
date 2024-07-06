@@ -44,7 +44,7 @@ def get_requests():
 
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])
-@limiter.limit('20/minute', override_defaults=True)
+@limiter.limit('60/minute', override_defaults=True)
 def frontend_visits():
     if request.method == 'GET':
         params = request.args
