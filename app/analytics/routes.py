@@ -10,6 +10,7 @@ from app.extensions import limiter
 from zoneinfo import ZoneInfo
 from dateutil import parser
 
+
 @bp.route('/requests', methods=['GET'])
 @limiter.limit('20/minute', override_defaults=True)
 def get_requests():
@@ -21,7 +22,7 @@ def get_requests():
 
         # List of allowed parameters
         allowed_params = {'endpoint', 'start_time', 'end_time'}
-        
+
         # Check for unknown parameters
         unknown_params = set(params.keys()) - allowed_params
         if unknown_params:
@@ -30,15 +31,17 @@ def get_requests():
         # Parse datetime parameters
         start_time = parse_datetime(start_time_str) if start_time_str else None
         end_time = parse_datetime(end_time_str) if end_time_str else None
-        
+
         if (start_time_str and start_time is None) or (end_time_str and end_time is None):
             return jsonify({'error': 'Invalid datetime format. Use YYYY-MM-DDTHH:MM:SS'}), 400
-        
+
         # Determine the appropriate bucket size based on the date range
         bucket_size = determine_bucket_size(start_time, end_time)
 
-        result = get_api_requests_per_bucket(bucket_size, endpoint, start_time, end_time)
+        result = get_api_requests_per_bucket(
+            bucket_size, endpoint, start_time, end_time)
         return jsonify(result), 200
+
 
 @bp.route('/frontend_visits', methods=['GET', 'POST'])
 @limiter.limit('20/minute', override_defaults=True)
@@ -51,7 +54,7 @@ def frontend_visits():
 
         # List of allowed parameters
         allowed_params = {'route', 'start_time', 'end_time'}
-        
+
         # Check for unknown parameters
         unknown_params = set(params.keys()) - allowed_params
         if unknown_params:
@@ -60,34 +63,39 @@ def frontend_visits():
         # Parse datetime parameters
         start_time = parse_datetime(start_time_str) if start_time_str else None
         end_time = parse_datetime(end_time_str) if end_time_str else None
-        
+
         if (start_time_str and start_time is None) or (end_time_str and end_time is None):
             return jsonify({'error': f'Invalid ISO 8601datetime format. Use YYYY-MM-DDTHH:MM:SS+HH:MM. start_time: {start_time}, end_time: {end_time}'}), 400
-        
+
         # Determine the appropriate bucket size based on the date range
         bucket_size = determine_bucket_size(start_time, end_time)
 
-        result = get_frontend_log_per_bucket(bucket_size, route, start_time, end_time)
+        result = get_frontend_log_per_bucket(
+            bucket_size, route, start_time, end_time)
         return jsonify(result), 200
     elif request.method == 'POST':
         data = request.json
         if 'route' not in data:
             return jsonify({"success": False, 'error': 'route not provided'}), 400
-        
+
         # Check if the route is valid for security purposes (so we dont get any bad words in a nonexistent route)
         route = data['route']
         if not check_url_validity(f'https://www.ashwingur.com/{route}'):
             route = "404"
-        
+
         insert_frontend_log(sanitise_route(route))
         return jsonify({'success': True}), 201
+
 
 def sanitise_route(route: str) -> str:
     if '/ClashOfClans/player/' in route:
         return '/ClashOfClans/player'
     elif '/ClashOfClans/clan/' in route:
         return '/ClashOfClans/clan'
+    elif '/MediaReviewsV2/Edit' in route or '/MediaReviews/Edit' in route:
+        return '/MediaReviews/Edit'
     return route
+
 
 def check_url_validity(url: str) -> bool:
     try:
@@ -99,6 +107,7 @@ def check_url_validity(url: str) -> bool:
             return False
     except requests.exceptions.RequestException as e:
         return False
+
 
 def parse_datetime(date_str: str):
     try:
@@ -113,11 +122,12 @@ def parse_datetime(date_str: str):
         return dt
     except ValueError:
         return None
-    
+
+
 def determine_bucket_size(start_time: datetime, end_time: datetime):
     if not start_time or not end_time:
         return '1 day'  # Default bucket size if no dates are provided
-    
+
     date_diff = (end_time - start_time).days
     seconds_difference = (end_time - start_time).total_seconds()
 
@@ -125,7 +135,7 @@ def determine_bucket_size(start_time: datetime, end_time: datetime):
         return '1 minute'
     elif seconds_difference <= 43200:
         return '5 minutes'
-    
+
     if date_diff <= 1:
         return '15 minutes'
     elif date_diff <= 7:
