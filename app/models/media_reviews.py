@@ -238,6 +238,8 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
 
     @validates("cover_image_bg_colour")
     def validate_cover_image_bg_colour(self, value):
+        if not value:
+            return
         hex_color_regex = r'^#[A-Fa-f0-9]{6}$'
         if not re.match(hex_color_regex, value):
             raise ValidationError(f"'{value}' is not a valid HEX colour")
@@ -284,6 +286,8 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
 
     @validates("cover_image_bg_colour")
     def validate_cover_image_bg_colour(self, value):
+        if not value:
+            return
         hex_color_regex = r'^#[A-Fa-f0-9]{6}$'
         if not re.match(hex_color_regex, value):
             raise ValidationError(f"'{value}' is not a valid HEX colour")
