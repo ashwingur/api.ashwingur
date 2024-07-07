@@ -1,15 +1,17 @@
-from datetime import datetime
 import sys
-from flask import app, render_template, request, jsonify
-import requests
-from app.main import bp
-from app.extensions import limiter, login_manager, db
-from flask_login import login_user, logout_user, login_required, current_user
-from app.models.user import User
-from app.extensions import roles_required, get_real_ip
-from werkzeug.security import generate_password_hash, check_password_hash
-from app.image_proxy import ImageProxy
+from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import requests
+from flask import app, jsonify, render_template, request
+from flask_login import current_user, login_required, login_user, logout_user
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from app.extensions import (db, get_real_ip, limiter, login_manager,
+                            roles_required)
+from app.image_proxy import ImageProxy
+from app.main import bp
+from app.models.user import User
 
 POSSIBLE_ROLES = ['user', 'admin']
 
@@ -24,21 +26,21 @@ def image_test():
     return ImageProxy.sign_image_url("https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg", use_webp=True)
 
 
-@ bp.route('/ip')
+@bp.route('/ip')
 def ip():
     ip = get_real_ip()
     return f"<h1>Your IP: {ip}</h1>"
 
 
-@ login_manager.user_loader
+@login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-@ bp.route('/users', methods=['GET', 'POST', 'DELETE'])
-@ limiter.limit("30/minute", override_defaults=True)
-@ login_required
-@ roles_required('admin')
+@bp.route('/users', methods=['GET', 'POST', 'DELETE'])
+@limiter.limit("30/minute", override_defaults=True)
+@login_required
+@roles_required('admin')
 def users():
     if request.method == 'GET':
         # Return all users from the database with all data except password
@@ -54,6 +56,9 @@ def users():
         password = data.get('password')
         # Assuming role is provided in the request body
         role = data.get('role')
+
+        if role != "user":
+            return jsonify({'error': 'Only user role can be created'}), 403
 
         if not username or not password or not role:
             return jsonify({'message': 'Username, password, and role are required'}), 400
@@ -95,8 +100,8 @@ def users():
         return jsonify({'message': f"User '{deleted_username}' deleted successfully"}), 200
 
 
-@ bp.route('/login', methods=['POST'])
-@ limiter.limit("10/minute", override_defaults=False)
+@bp.route('/login', methods=['POST'])
+@limiter.limit("10/minute", override_defaults=False)
 def login():
     data = request.json
     username = data.get('username')
@@ -115,15 +120,15 @@ def login():
     return jsonify({'message': 'Invalid credentials', 'authenticated': False}), 401
 
 
-@ bp.route('/logout', methods=['POST'])
-@ login_required
+@bp.route('/logout', methods=['POST'])
+@login_required
 def logout():
     logout_user()
     return jsonify({'message': 'Logout successful'}), 200
 
 
-@ bp.route('/checkauth', methods=['GET'])
-@ limiter.exempt
+@bp.route('/checkauth', methods=['GET'])
+@limiter.exempt
 def check_auth():
     if current_user.is_authenticated:
         return jsonify({'authenticated': True, 'id': current_user.id, 'username': current_user.username, 'role': current_user.role})
@@ -133,15 +138,15 @@ def check_auth():
 # TEST
 
 
-@ bp.route('/admin_test', methods=['GET'])
-@ login_required
-@ roles_required('admin')
+@bp.route('/admin_test', methods=['GET'])
+@login_required
+@roles_required('admin')
 def admin_dashboard():
     return jsonify({'message': 'Welcome to the admin dashboard', 'username': current_user.username})
 
 
-@ bp.route('/user_test', methods=['GET'])
-@ login_required
-@ roles_required('user', 'admin')
+@bp.route('/user_test', methods=['GET'])
+@login_required
+@roles_required('user', 'admin')
 def user_dashboard():
     return jsonify({'message': 'Welcome to the user dashboard', 'username': current_user.username})
