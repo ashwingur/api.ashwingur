@@ -188,6 +188,8 @@ def get_submediareview(id):
 
 
 @bp.route('/submediareview', methods=['POST'])
+@login_required
+@roles_required('admin')
 def create_submediareview():
     json_data = request.get_json()
     if not json_data:
@@ -204,6 +206,8 @@ def create_submediareview():
 
 
 @bp.route('/submediareview/<int:id>', methods=['PUT'])
+@login_required
+@roles_required('admin')
 def update_submediareview(id):
     json_data = request.get_json()
     if not json_data:
@@ -224,6 +228,8 @@ def update_submediareview(id):
 
 
 @bp.route('/submediareview/<int:id>', methods=['DELETE'])
+@login_required
+@roles_required('admin')
 def delete_submediareview(id):
     sub_media_review = SubMediaReview.query.get(id)
     if not sub_media_review:
