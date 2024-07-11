@@ -35,6 +35,7 @@ def get_paginated_reviews():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     media_types = request.args.getlist('media_types')
+    order_by = request.args.get('order_by', "name_asc")
 
     query = MediaReview.query
 
@@ -42,8 +43,30 @@ def get_paginated_reviews():
     if media_types:
         query = query.filter(MediaReview.media_type.in_(media_types))
 
+    # order
+    if order_by == "name_asc":
+        query = query.order_by(MediaReview.name.asc())
+    elif order_by == "name_desc":
+        query = query.order_by(MediaReview.name.desc())
+    elif order_by == "rating_asc":
+        query = query.order_by(MediaReview.rating.asc().nulls_last())
+    elif order_by == "rating_desc":
+        query = query.order_by(MediaReview.rating.desc().nulls_last())
+    elif order_by == "media_creation_asc":
+        query = query.order_by(
+            MediaReview.media_creation_date.asc().nulls_last())
+    elif order_by == "media_creation_desc":
+        query = query.order_by(
+            MediaReview.media_creation_date.desc().nulls_last())
+    elif order_by == "word_count_asc":
+        query = query.order_by(MediaReview.word_count.asc().nulls_last())
+    elif order_by == "word_count_desc":
+        query = query.order_by(MediaReview.word_count.desc().nulls_last())
+    else:
+        query = query.order_by(MediaReview.name.asc())
+
     # Order the results and apply pagination
-    paginated_reviews = query.order_by(MediaReview.name.asc()).paginate(
+    paginated_reviews = query.paginate(
         page=page, per_page=per_page, max_per_page=30, error_out=False)
 
     media_reviews_data = media_reviews_list_schema.dump(
