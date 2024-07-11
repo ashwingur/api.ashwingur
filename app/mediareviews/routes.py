@@ -45,25 +45,29 @@ def get_paginated_reviews():
 
     # order
     if order_by == "name_asc":
-        query = query.order_by(MediaReview.name.asc())
+        query = query.order_by(MediaReview.name.asc(), MediaReview.id.asc())
     elif order_by == "name_desc":
-        query = query.order_by(MediaReview.name.desc())
+        query = query.order_by(MediaReview.name.desc(), MediaReview.id.asc())
     elif order_by == "rating_asc":
-        query = query.order_by(MediaReview.rating.asc().nulls_last())
+        query = query.order_by(
+            MediaReview.rating.asc().nulls_last(), MediaReview.id.asc())
     elif order_by == "rating_desc":
-        query = query.order_by(MediaReview.rating.desc().nulls_last())
+        query = query.order_by(
+            MediaReview.rating.desc().nulls_last(), MediaReview.id.asc())
     elif order_by == "media_creation_asc":
         query = query.order_by(
-            MediaReview.media_creation_date.asc().nulls_last())
+            MediaReview.media_creation_date.asc().nulls_last(), MediaReview.id.asc())
     elif order_by == "media_creation_desc":
         query = query.order_by(
-            MediaReview.media_creation_date.desc().nulls_last())
+            MediaReview.media_creation_date.desc().nulls_last(), MediaReview.id.asc())
     elif order_by == "word_count_asc":
-        query = query.order_by(MediaReview.word_count.asc().nulls_last())
+        query = query.order_by(
+            MediaReview.word_count.asc().nulls_last(), MediaReview.id.asc())
     elif order_by == "word_count_desc":
-        query = query.order_by(MediaReview.word_count.desc().nulls_last())
+        query = query.order_by(
+            MediaReview.word_count.desc().nulls_last(), MediaReview.id.asc())
     else:
-        query = query.order_by(MediaReview.name.asc())
+        query = query.order_by(MediaReview.name.asc(), MediaReview.id.asc())
 
     # Order the results and apply pagination
     paginated_reviews = query.paginate(
