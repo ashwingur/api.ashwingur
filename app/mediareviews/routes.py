@@ -6,7 +6,6 @@ from marshmallow import ValidationError
 from app.mediareviews import bp
 from flask import jsonify, request
 from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
-from app.models.media_reviews import get_all_media_reviews_with_genres, create_new_media_review, update_media_review, delete_media_review
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
 from zoneinfo import ZoneInfo
@@ -35,10 +34,13 @@ def get_paginated_reviews():
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
+    media_types = request.args.getlist('media_types')
 
     query = MediaReview.query
 
     # apply filtering...
+    if media_types:
+        query = query.filter(MediaReview.media_type.in_(media_types))
 
     # Order the results and apply pagination
     paginated_reviews = query.order_by(MediaReview.name.asc()).paginate(
