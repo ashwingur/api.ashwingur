@@ -144,12 +144,6 @@ def update_review(review_id):
     except ValidationError as err:
         return jsonify({"error": f"Issue with provided fields: {err.messages}"}), 422
 
-    # Check if the MediaReview already exists with the same name for the given media_review
-    existing_name = MediaReview.query.filter_by(
-        name=media_review.name).first()
-    if existing_name and existing_name.media_type == media_review.media_type:
-        return jsonify({"error": f"Review with the name '{existing_name.name}' already exists for media_type '{existing_name.media_type}'"}), 409
-
     # Process genres separately
     genre_names = [genre['name'] for genre in genres_data]
     existing_genres = Genre.query.filter(Genre.name.in_(genre_names)).all()
