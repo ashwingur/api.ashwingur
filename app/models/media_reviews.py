@@ -79,8 +79,8 @@ class MediaReview(db.Model):
         # Check if the MediaReview already exists with the same name for the given media_review
         existing_review = MediaReview.query.filter_by(
             name=self.name).first()
-        if existing_review:
-            return jsonify({"error": f"Media with the name '{self.name}' already exists"}), 409
+        if existing_review and existing_review.media_type == self.media_type:
+            return jsonify({"error": f"Review with the name '{self.name}' already exists for media_type '{self.media_type}'"}), 409
 
         try:
             # Fetch or create genres based on provided data
