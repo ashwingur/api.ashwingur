@@ -35,6 +35,8 @@ def get_paginated_reviews():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     media_types = request.args.getlist('media_types')
+    genres = request.args.getlist('genres')
+    creators = request.args.getlist('creators')
     order_by = request.args.get('order_by', "name_asc")
     show_hidden = request.args.get('show_hidden', 'false').lower() in [
         'true', '1', 't', 'yes']
@@ -44,6 +46,12 @@ def get_paginated_reviews():
     # apply filtering
     if media_types:
         query = query.filter(MediaReview.media_type.in_(media_types))
+
+    if creators:
+        query = query.filter(MediaReview.creator.in_(creators))
+
+    if genres:
+        query = query.join(MediaReview.genres).filter(Genre.name.in_(genres))
 
     if not show_hidden:
         query = query.filter(MediaReview.visible == True)
