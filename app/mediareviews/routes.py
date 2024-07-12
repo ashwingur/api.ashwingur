@@ -36,12 +36,17 @@ def get_paginated_reviews():
     per_page = request.args.get('per_page', 10, type=int)
     media_types = request.args.getlist('media_types')
     order_by = request.args.get('order_by', "name_asc")
+    show_hidden = request.args.get('show_hidden', 'false').lower() in [
+        'true', '1', 't', 'yes']
 
     query = MediaReview.query
 
-    # apply filtering...
+    # apply filtering
     if media_types:
         query = query.filter(MediaReview.media_type.in_(media_types))
+
+    if not show_hidden:
+        query = query.filter(MediaReview.visible == True)
 
     # order
     if order_by == "name_asc":
@@ -86,6 +91,25 @@ def get_paginated_reviews():
     }
 
     return jsonify(response)
+
+
+@bp.route('/metadata', methods=['GET'])
+@limiter.limit('40/minute', override_defaults=True)
+def get_metadata():
+    """
+        Returns all media review meta data including every genre and author
+    """
+    creators = MediaReview.query.with_entities(
+        MediaReview.creator).filter(MediaReview.creator.isnot(None)).distinct().order_by(MediaReview.creator.asc()).all()
+    genres = Genre.query.order_by(Genre.name.asc())
+
+    genres_list = genre_list_schema.dump(genres)
+    creators_list = [creator[0] for creator in creators]
+
+    return jsonify({
+        'creators': creators_list,
+        'genres': genres_list
+    })
 
 
 @bp.route('', methods=['POST'])
