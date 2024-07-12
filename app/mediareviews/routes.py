@@ -130,8 +130,13 @@ def get_metadata():
         SubMediaReview.name
     ).order_by(SubMediaReview.name.asc()).all()
 
-    all_review_names = sorted(
-        [name[0] for name in media_review_names] + [name[0] for name in sub_media_review_names])
+    # Combine and deduplicate the review names
+    all_review_names = list(set(
+        [name[0] for name in media_review_names] + [name[0]
+                                                    for name in sub_media_review_names]
+    ))
+    all_review_names.sort()  # Sort the unique names
+
     genres_list = genre_list_schema.dump(genres)
     creators_list = [creator[0] for creator in creators]
 
