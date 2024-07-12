@@ -9,6 +9,7 @@ from app.models.frontend_log import get_frontend_log_per_bucket, insert_frontend
 from app.extensions import limiter
 from zoneinfo import ZoneInfo
 from dateutil import parser
+from urllib.parse import urlparse
 
 
 @bp.route('/requests', methods=['GET'])
@@ -88,13 +89,22 @@ def frontend_visits():
 
 
 def sanitise_route(route: str) -> str:
-    if '/ClashOfClans/player/' in route:
+    # Parse the URL to get the path
+    parsed_url = urlparse(route)
+    path = parsed_url.path
+
+    # Sanitise the route based on your specified conditions
+    if '/ClashOfClans/player/' in path:
         return '/ClashOfClans/player'
-    elif '/ClashOfClans/clan/' in route:
+    elif '/ClashOfClans/clan/' in path:
         return '/ClashOfClans/clan'
-    elif '/MediaReviewsV2/Edit' in route or '/MediaReviews/Edit' in route:
+    elif '/MediaReviewsV2/Edit' in path or '/MediaReviews/Edit' in path:
         return '/MediaReviews/Edit'
-    return route
+    elif '/MediaReviewsV2' in path:
+        return '/MediaReviewsV2'
+    elif '/MediaReviews' in path:
+        return '/MediaReviews'
+    return path
 
 
 def check_url_validity(url: str) -> bool:
