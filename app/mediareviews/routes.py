@@ -3,6 +3,7 @@ import sys
 from typing import List
 from flask_login import login_required
 from marshmallow import ValidationError
+from sqlalchemy import or_
 from app.mediareviews import bp
 from flask import jsonify, request
 from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
@@ -37,6 +38,7 @@ def get_paginated_reviews():
     media_types = request.args.getlist('media_types')
     genres = request.args.getlist('genres')
     creators = request.args.getlist('creators')
+    names = request.args.getlist('names')
     order_by = request.args.get('order_by', "name_asc")
     show_hidden = request.args.get('show_hidden', 'false').lower() in [
         'true', '1', 't', 'yes']
@@ -44,6 +46,14 @@ def get_paginated_reviews():
     query = MediaReview.query
 
     # apply filtering
+    if names:
+        query = query.outerjoin(SubMediaReview, MediaReview.sub_media_reviews).filter(
+            or_(
+                MediaReview.name.in_(names),
+                SubMediaReview.name.in_(names)
+            )
+        )
+
     if media_types:
         query = query.filter(MediaReview.media_type.in_(media_types))
 
@@ -109,14 +119,26 @@ def get_metadata():
     """
     creators = MediaReview.query.with_entities(
         MediaReview.creator).filter(MediaReview.creator.isnot(None)).distinct().order_by(MediaReview.creator.asc()).all()
+
     genres = Genre.query.order_by(Genre.name.asc())
 
+    media_review_names = MediaReview.query.with_entities(
+        MediaReview.name
+    ).order_by(MediaReview.name.asc()).all()
+
+    sub_media_review_names = SubMediaReview.query.with_entities(
+        SubMediaReview.name
+    ).order_by(SubMediaReview.name.asc()).all()
+
+    all_review_names = sorted(
+        [name[0] for name in media_review_names] + [name[0] for name in sub_media_review_names])
     genres_list = genre_list_schema.dump(genres)
     creators_list = [creator[0] for creator in creators]
 
     return jsonify({
         'creators': creators_list,
-        'genres': genres_list
+        'genres': genres_list,
+        'review_names': all_review_names
     })
 
 
