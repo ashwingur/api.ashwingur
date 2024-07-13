@@ -84,11 +84,17 @@ def get_paginated_reviews():
         query = query.order_by(
             MediaReview.media_creation_date.desc().nulls_last(), MediaReview.id.asc())
     elif order_by == "word_count_asc":
-        query = query.order_by(
-            MediaReview.word_count.asc().nulls_last(), MediaReview.id.asc())
+        query = query.filter(MediaReview.word_count.isnot(None)).order_by(
+            MediaReview.word_count.asc(), MediaReview.id.asc())
     elif order_by == "word_count_desc":
-        query = query.order_by(
-            MediaReview.word_count.desc().nulls_last(), MediaReview.id.asc())
+        query = query.filter(MediaReview.word_count.isnot(None)).order_by(
+            MediaReview.word_count.desc(), MediaReview.id.asc())
+    elif order_by == "run_time_asc":
+        query = query.filter(MediaReview.run_time.isnot(None)).order_by(
+            MediaReview.run_time.asc(), MediaReview.id.asc())
+    elif order_by == "run_time_desc":
+        query = query.filter(MediaReview.run_time.isnot(None)).order_by(
+            MediaReview.run_time.desc(), MediaReview.id.asc())
     else:
         query = query.order_by(MediaReview.name.asc(), MediaReview.id.asc())
 
