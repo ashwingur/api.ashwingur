@@ -96,7 +96,8 @@ def get_paginated_reviews():
         query = query.filter(MediaReview.run_time.isnot(None)).order_by(
             MediaReview.run_time.desc(), MediaReview.id.asc())
     else:
-        query = query.order_by(MediaReview.name.asc(), MediaReview.id.asc())
+        query = query.order_by(
+            MediaReview.rating.desc().nulls_last(), MediaReview.id.asc())
 
     # Order the results and apply pagination
     paginated_reviews = query.paginate(
