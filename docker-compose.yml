@@ -64,6 +64,7 @@ services:
       - IMGPROXY_ENABLE_WEBP_DETECTION="true"
       - IMGPROXY_KEY=${IMGPROXY_KEY}
       - IMGPROXY_SALT=${IMGPROXY_SALT}
+      - IMGPROXY_MAX_ANIMATION_FRAMES=30
     networks:
       - app_network
 

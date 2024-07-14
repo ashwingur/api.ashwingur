@@ -12,13 +12,11 @@ class ImageProxy:
 
     @staticmethod
     def sign_image_url(url: str, use_webp: bool) -> str:
-
         # Detect the image source image format
         mime_type, _ = mimetypes.guess_type(url)
-        format_extension = 'webp' if mime_type == 'image/webp' else ''
 
-        # Only process to webp if it isn't already
-        if use_webp and format_extension != 'webp':
+        # Only process to webp if it isn't already and handle animated GIFs
+        if use_webp:
             imgproxy_url = f'/plain/{url}@webp'
         else:
             imgproxy_url = f'/plain/{url}'
