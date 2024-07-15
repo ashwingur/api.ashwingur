@@ -52,7 +52,7 @@ def get_paginated_reviews():
                 MediaReview.name.in_(names),
                 SubMediaReview.name.in_(names)
             )
-        )
+        ).distinct()
 
     if media_types:
         query = query.filter(MediaReview.media_type.in_(media_types))
