@@ -233,7 +233,7 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
 
     def get_signed_cover_image(self, obj):
         if obj.cover_image:
-            return ImageProxy.sign_image_url(obj.cover_image, use_webp=True)
+            return ImageProxy.sign_image_url(obj.cover_image, format='avif', h=320, enlarge=True, quality=60)
         return None
 
     @validates("cover_image_bg_colour")
@@ -281,7 +281,7 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
 
     def get_signed_cover_image(self, obj):
         if obj.cover_image:
-            return ImageProxy.sign_image_url(obj.cover_image, use_webp=True)
+            return ImageProxy.sign_image_url(obj.cover_image, format='avif', h=320, enlarge=True, quality=60)
         return None
 
     @validates("cover_image_bg_colour")

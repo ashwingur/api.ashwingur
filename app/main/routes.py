@@ -23,7 +23,7 @@ def index():
 
 @bp.route('/imagetest')
 def image_test():
-    return ImageProxy.sign_image_url("https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg", use_webp=True)
+    return ImageProxy.sign_image_url("https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg", format='avif')
 
 
 @bp.route('/ip')
