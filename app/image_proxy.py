@@ -16,7 +16,7 @@ class ImageProxy:
 
         # Only process to webp if it isn't already and handle animated GIFs
         if use_webp:
-            imgproxy_url = f'/plain/{url}@webp'
+            imgproxy_url = f'/rs:fit:0:320:0/plain/{url}@webp'
         else:
             imgproxy_url = f'/plain/{url}'
 
