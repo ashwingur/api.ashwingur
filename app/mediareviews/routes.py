@@ -171,13 +171,11 @@ def get_metadata():
     categorize_ratings(sub_media_reviews, rating_bins_with_sub_reviews)
 
     # Calculate total word count and run time
-    total_word_count = sum(word_count for _, _, word_count, _, _ in media_reviews if word_count is not None) + \
-        sum(word_count for _, _, word_count, _
-            in sub_media_reviews if word_count is not None)
+    total_word_count = sum(word_count for _, _, word_count,
+                           _, _ in media_reviews if word_count is not None)
 
-    total_run_time = sum(run_time for _, _, _, run_time, _ in media_reviews if run_time is not None) + \
-        sum(run_time for _, _, _, run_time
-            in sub_media_reviews if run_time is not None)
+    total_run_time = sum(run_time for _, _, _, run_time,
+                         _ in media_reviews if run_time is not None)
 
     return jsonify({
         'creators': creators_list,
