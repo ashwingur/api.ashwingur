@@ -6,18 +6,23 @@ from psycopg2 import sql
 from zoneinfo import ZoneInfo
 from sqlalchemy import CheckConstraint, text
 
+
 class SensorData(db.Model):
     __tablename__ = 'sensor_data'
-    timestamp = db.Column(db.DateTime(timezone=True), primary_key=True, nullable=False)
+    timestamp = db.Column(db.DateTime(timezone=True),
+                          primary_key=True, nullable=False)
     temperature = db.Column(db.Float)
     pressure = db.Column(db.Float)
     humidity = db.Column(db.Float)
     ambient_light = db.Column(db.Float)
-    air_quality_index = db.Column(db.SmallInteger, CheckConstraint('air_quality_index >= 1 AND air_quality_index <= 5'))
+    air_quality_index = db.Column(db.SmallInteger, CheckConstraint(
+        'air_quality_index >= 1 AND air_quality_index <= 5'))
     tvoc = db.Column(db.SmallInteger)
     eco2 = db.Column(db.SmallInteger)
 
 # Create the sensor data table and convert it to a hypertable
+
+
 def setup_sensor_data_table():
     conn = psycop_conn()
     cur = conn.cursor()
@@ -33,6 +38,7 @@ def setup_sensor_data_table():
     cur.close()
     conn.close()
 
+
 def insert_sensor_data(timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2):
     """
     Insert a new record into the sensor_data table.
@@ -45,8 +51,10 @@ def insert_sensor_data(timestamp, temperature, pressure, humidity, ambient_light
     conn = psycop_conn()
     with conn:
         with conn.cursor() as cur:
-            cur.execute(insert_query, (timestamp, temperature, pressure, humidity, ambient_light, air_quality_index, TVOC, eCO2))
+            cur.execute(insert_query, (timestamp, temperature, pressure,
+                        humidity, ambient_light, air_quality_index, TVOC, eCO2))
     conn.close()
+
 
 def get_latest_single_sensor_data():
     """
@@ -64,7 +72,8 @@ def get_latest_single_sensor_data():
     conn.close()
 
     if row:
-        latest_data = [int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]]
+        latest_data = [int(row[0].timestamp()), row[1], row[2],
+                       row[3], row[4], row[5], row[6], row[7]]
         return latest_data
     else:
         return []
@@ -84,19 +93,21 @@ def get_all_sensor_data():
         rows = cur.fetchall()
     conn.close()
 
-    sensor_data_list = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in rows]
+    sensor_data_list = [[int(row[0].timestamp()), row[1], row[2],
+                         row[3], row[4], row[5], row[6], row[7]] for row in rows]
 
     return sensor_data_list
+
 
 def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_time_bucket=None):
     """
     Retrieve sensor data aggregated over the specified time bucket between start and end timestamps.
-    
+
     Parameters:
     - start: The start timestamp (datetime object).
     - end: The end timestamp (datetime object).
     - custom_time_bucket: Optional. A string representing the time bucket for aggregation (e.g., '1 hour', '1 day', '30 minutes').
-    
+
     Returns:
     - results: A list of lists containing the aggregated data.
     """
@@ -104,7 +115,7 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
         days = (end - start).days
         if days <= 2:
             time_bucket = '5 minutes'
-        elif days <= 4: 
+        elif days <= 4:
             time_bucket = '15 minutes'
         elif days <= 7:
             time_bucket = '30 minutes'
@@ -112,8 +123,6 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
             time_bucket = '1 hour'
         elif days <= 32:
             time_bucket = '2 hours'
-        elif days <= 90:
-            time_bucket = '6 hours'
         else:
             time_bucket = '1 day'
     else:
@@ -152,17 +161,18 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
 def get_sensor_stats_between_timestamps(start: datetime, end: datetime):
     """
     Retrieve the minimum, maximum, and average values for all metrics within the specified time range, aggregated in 15-minute buckets.
-    
+
     Parameters:
     - start: The start timestamp (datetime object).
     - end: The end timestamp (datetime object).
-    
+
     Returns:
     - result: A dictionary where the key is the metric name and the value is another dictionary containing 'min', 'max', and 'average' values.
     """
-    metrics = ['temperature', 'pressure', 'humidity', 'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
+    metrics = ['temperature', 'pressure', 'humidity',
+               'ambient_light', 'air_quality_index', 'TVOC', 'eCO2']
     result = {}
-    
+
     for metric in metrics:
         query = f"""
         WITH bucketed_data AS (
@@ -223,8 +233,10 @@ def get_sensor_stats_between_timestamps(start: datetime, end: datetime):
         finally:
             conn.close()
 
-        min_result = next(({'timestamp': int(row[0].timestamp()), 'value': round(float(row[1]), 3)} for row in results if row[1] == row[2]), None)
-        max_result = next(({'timestamp': int(row[0].timestamp()), 'value': round(float(row[1]), 3)} for row in results if row[1] == row[3]), None)
+        min_result = next(({'timestamp': int(row[0].timestamp()), 'value': round(
+            float(row[1]), 3)} for row in results if row[1] == row[2]), None)
+        max_result = next(({'timestamp': int(row[0].timestamp()), 'value': round(
+            float(row[1]), 3)} for row in results if row[1] == row[3]), None)
         average_value = round(float(avg_result[0]), 3) if avg_result else None
 
         result[metric] = {
@@ -232,7 +244,7 @@ def get_sensor_stats_between_timestamps(start: datetime, end: datetime):
             'max': max_result,
             'average': average_value
         }
-    
+
     return result
 
 
@@ -240,14 +252,16 @@ def execute_sensor_query(query):
     # Check if the query is a read-only query
     if not query.strip().lower().startswith("select"):
         raise ValueError("Only SELECT queries are allowed.")
-    
+
     conn = psycop_conn()
     with conn.cursor() as cur:
         cur.execute(query)
         results = cur.fetchall()
     conn.close()
-    results = [[int(row[0].timestamp()), row[1], row[2], row[3], row[4], row[5], row[6], row[7]] for row in results]
+    results = [[int(row[0].timestamp()), row[1], row[2], row[3],
+                row[4], row[5], row[6], row[7]] for row in results]
     return results
+
 
 def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
     """
@@ -260,18 +274,21 @@ def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
 
     """
     # Current timestamp
-    current_timestamp = datetime.now(tz=ZoneInfo("UTC")) - timedelta(days=days_from_past)
-    
+    current_timestamp = datetime.now(tz=ZoneInfo(
+        "UTC")) - timedelta(days=days_from_past)
+
     for i in range(n):
         # Generate reasonable random values for other columns
         temperature = random.uniform(10, 40)  # Celsius
         pressure = random.uniform(950, 1050)  # Assuming pressure in hPa
         humidity = random.uniform(30, 90)     # Assuming humidity in %
-        ambient_light = random.uniform(0, 1000) # Assuming ambient light in lux
-        air_quality_index = random.randint(1, 5) # Assuming AQI index
-        TVOC = random.uniform(0, 600)         # Total Volatile Organic Compounds in ppb
+        # Assuming ambient light in lux
+        ambient_light = random.uniform(0, 1000)
+        air_quality_index = random.randint(1, 5)  # Assuming AQI index
+        # Total Volatile Organic Compounds in ppb
+        TVOC = random.uniform(0, 600)
         eCO2 = random.uniform(400, 5000)      # Equivalent CO2 in ppm
-        
+
         # Call the insert function
         insert_sensor_data(
             current_timestamp,
@@ -283,6 +300,6 @@ def test_insert_sensor_data(n: int, days_from_past=0, time_gap_seconds=300):
             TVOC,
             eCO2
         )
-        
+
         # Increment the timestamp by 'time_gap' seconds
         current_timestamp += timedelta(seconds=time_gap_seconds)

@@ -130,7 +130,7 @@ def get_metadata():
     genres = Genre.query.order_by(Genre.name.asc())
 
     media_reviews = MediaReview.query.with_entities(
-        MediaReview.name, MediaReview.rating, MediaReview.word_count, MediaReview.run_time
+        MediaReview.name, MediaReview.rating, MediaReview.word_count, MediaReview.run_time, MediaReview.media_type
     ).order_by(MediaReview.name.asc()).all()
 
     sub_media_reviews = SubMediaReview.query.with_entities(
@@ -147,31 +147,37 @@ def get_metadata():
     genres_list = genre_list_schema.dump(genres)
     creators_list = [creator[0] for creator in creators]
 
-    # Combine ratings
-    ratings = [rating for _, rating, _,
-               _ in media_reviews if rating is not None]
-    ratings_with_subreviews = [rating for _, rating, _, _ in media_reviews if rating is not None] + \
-        [rating for _, rating, _, _ in sub_media_reviews if rating is not None]
+    # Combine ratings by media type
+    rating_bins = {'all': [0] * 10}
+    rating_bins_with_sub_reviews = {'all': [0] * 10}
 
-    # Initialize the rating bins
-    rating_bins = [0] * 10
-    rating_bins_with_sub_reviews = [0] * 10
+    for media_type in ['Movie', 'Book', 'Show', 'Game', 'Music']:
+        rating_bins[media_type.lower()] = [0] * 10
 
-    # Categorize ratings into bins
-    for rating in ratings:
-        index = min(int(rating // 1), 9)  # Ensure the index is between 0 and 9
-        rating_bins[index] += 1
-    for rating in ratings_with_subreviews:
-        index = min(int(rating // 1), 9)  # Ensure the index is between 0 and 9
-        rating_bins_with_sub_reviews[index] += 1
+    def categorize_ratings(reviews, bins, by_media_type=False):
+        for review in reviews:
+            rating = review[1]
+            if rating is not None:
+                # Ensure the index is between 0 and 9
+                index = min(int(rating // 1), 9)
+                bins['all'][index] += 1
+                if by_media_type:
+                    media_type = review[4]
+                    if media_type:
+                        bins[media_type.lower()][index] += 1
+
+    categorize_ratings(media_reviews, rating_bins, by_media_type=True)
+    categorize_ratings(media_reviews, rating_bins_with_sub_reviews)
+    categorize_ratings(sub_media_reviews, rating_bins_with_sub_reviews)
 
     # Calculate total word count and run time
-    total_word_count = sum(word_count for _, _, word_count, _ in media_reviews if word_count is not None) + \
-        sum(word_count for _, _, word_count,
-            _ in sub_media_reviews if word_count is not None)
+    total_word_count = sum(word_count for _, _, word_count, _, _ in media_reviews if word_count is not None) + \
+        sum(word_count for _, _, word_count, _
+            in sub_media_reviews if word_count is not None)
 
-    total_run_time = sum(run_time for _, _, _, run_time in media_reviews if run_time is not None) + \
-        sum(run_time for _, _, _, run_time in sub_media_reviews if run_time is not None)
+    total_run_time = sum(run_time for _, _, _, run_time, _ in media_reviews if run_time is not None) + \
+        sum(run_time for _, _, _, run_time
+            in sub_media_reviews if run_time is not None)
 
     return jsonify({
         'creators': creators_list,
