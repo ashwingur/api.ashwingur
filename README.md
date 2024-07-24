@@ -16,13 +16,19 @@ docker-compose up --build
 docker compose up -d flask_db
 ```
 
-1. Start redis
+2. Start redis
 
 ```
 docker compose up -d flask_redis
 ```
 
-3. Start the flask app
+3. Start imgproxy
+
+```
+docker compose up -d imgproxy
+```
+
+4. Start the flask app
 
 ```
 docker compose up --build flask_app
