@@ -1,8 +1,8 @@
 import base64
 import hashlib
 import hmac
-import mimetypes
 from typing import Literal
+from urllib.parse import quote_plus
 
 from config import Config
 
@@ -16,7 +16,8 @@ class ImageProxy:
                        resizing_type: Literal['fit', 'fill',
                                               'fill-down', 'force', 'auto'] = 'fit',
                        w=0, h=0, enlarge: bool = False, quality=75) -> str:
-        # Detect the image source image format
+        # Escape special characters in url
+        url = quote_plus(url)
 
         # Only process to webp if it isn't already and handle animated GIFs
         imgproxy_url = f'/rs:{resizing_type}:{w}:{h}:{1 if enlarge else 0}/q:{quality}'
