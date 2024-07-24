@@ -38,4 +38,13 @@ POSTGRES_PASSWORD=def
 POSTGRES_DB=ghi
 FLASK_SECRET_KEY=jkl
 WEATHER_POST_PASSWORD=xyz
+FLASK_ENV=DEV
+
+IMGPROXY_KEY=XXX
+IMGPROXY_SALT=XXX
+
+# For flask migrate
+FLASK_APP="app:create_app"
+DB_URL=postgresql://user:password@localhost:5432/db_name
+REDIS_URL=redis://localhost:6379/0
 ```
