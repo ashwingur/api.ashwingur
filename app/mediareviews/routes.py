@@ -30,7 +30,7 @@ def get_review():
 
 
 @bp.route('/paginated', methods=['GET'])
-@limiter.limit('5/second', override_defaults=True)
+@limiter.limit('10/second', override_defaults=True)
 def get_paginated_reviews():
 
     page = request.args.get('page', 1, type=int)
