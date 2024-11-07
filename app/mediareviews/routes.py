@@ -3,7 +3,7 @@ import sys
 from typing import List
 from flask_login import login_required
 from marshmallow import ValidationError
-from sqlalchemy import or_
+from sqlalchemy import func, or_, desc
 from app.mediareviews import bp
 from flask import jsonify, request
 from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
@@ -43,7 +43,9 @@ def get_paginated_reviews():
     show_hidden = request.args.get('show_hidden', 'false').lower() in [
         'true', '1', 't', 'yes']
 
-    query = MediaReview.query
+    query = db.session.query(MediaReview).outerjoin(
+        SubMediaReview, MediaReview.sub_media_reviews
+    )
 
     # apply filtering
     if names:
@@ -95,6 +97,21 @@ def get_paginated_reviews():
     elif order_by == "run_time_desc":
         query = query.filter(MediaReview.run_time.isnot(None)).order_by(
             MediaReview.run_time.desc(), MediaReview.id.asc())
+    elif order_by == "last_update_desc":
+        # Order by the maximum last update date (both media and submedia reviews should be taken into account)
+        query = query.group_by(MediaReview.id).order_by(
+            desc(func.coalesce(
+                func.max(SubMediaReview.review_last_update_date),
+                MediaReview.review_last_update_date
+            ))
+        )
+    elif order_by == "last_update_asc":
+        query = query.group_by(MediaReview.id).order_by(
+            func.coalesce(
+                func.max(SubMediaReview.review_last_update_date),
+                MediaReview.review_last_update_date
+            ).asc()
+        )
     else:
         query = query.order_by(
             MediaReview.rating.desc().nulls_last(), MediaReview.id.asc())
