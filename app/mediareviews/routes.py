@@ -3,7 +3,7 @@ import sys
 from typing import List
 from flask_login import login_required
 from marshmallow import ValidationError
-from sqlalchemy import func, or_, desc
+from sqlalchemy import func, or_, select
 from app.mediareviews import bp
 from flask import jsonify, request
 from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
@@ -43,9 +43,7 @@ def get_paginated_reviews():
     show_hidden = request.args.get('show_hidden', 'false').lower() in [
         'true', '1', 't', 'yes']
 
-    query = db.session.query(MediaReview).outerjoin(
-        SubMediaReview, MediaReview.sub_media_reviews
-    )
+    query = MediaReview.query
 
     # apply filtering
     if names:
@@ -68,8 +66,18 @@ def get_paginated_reviews():
     if not show_hidden:
         query = query.filter(MediaReview.visible == True)
 
+    # Correlated subqueries for update dates (we want to take into account subquery update dates)
+    last_update_date = select(
+        func.coalesce(func.max(SubMediaReview.review_last_update_date),
+                      MediaReview.review_last_update_date)
+    ).where(SubMediaReview.media_review_id == MediaReview.id).scalar_subquery()
+
     # order
-    if order_by == "name_asc":
+    if order_by == "last_update_desc":
+        query = query.order_by(last_update_date.desc(), MediaReview.id.asc())
+    elif order_by == "last_update_asc":
+        query = query.order_by(last_update_date.asc(), MediaReview.id.asc())
+    elif order_by == "name_asc":
         query = query.order_by(MediaReview.name.asc(), MediaReview.id.asc())
     elif order_by == "name_desc":
         query = query.order_by(MediaReview.name.desc(), MediaReview.id.asc())
@@ -97,28 +105,13 @@ def get_paginated_reviews():
     elif order_by == "run_time_desc":
         query = query.filter(MediaReview.run_time.isnot(None)).order_by(
             MediaReview.run_time.desc(), MediaReview.id.asc())
-    elif order_by == "last_update_desc":
-        # Order by the maximum last update date (both media and submedia reviews should be taken into account)
-        query = query.group_by(MediaReview.id).order_by(
-            desc(func.coalesce(
-                func.max(SubMediaReview.review_last_update_date),
-                MediaReview.review_last_update_date
-            ))
-        )
-    elif order_by == "last_update_asc":
-        query = query.group_by(MediaReview.id).order_by(
-            func.coalesce(
-                func.max(SubMediaReview.review_last_update_date),
-                MediaReview.review_last_update_date
-            ).asc()
-        )
     else:
         query = query.order_by(
             MediaReview.rating.desc().nulls_last(), MediaReview.id.asc())
 
     # Order the results and apply pagination
     paginated_reviews = query.paginate(
-        page=page, per_page=per_page, max_per_page=30, error_out=False)
+        page=page, per_page=per_page, max_per_page=20, error_out=False)
 
     media_reviews_data = media_reviews_list_schema.dump(
         paginated_reviews.items)
