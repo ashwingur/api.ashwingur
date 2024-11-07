@@ -123,8 +123,10 @@ def get_sensor_data_between_timestamps(start: datetime, end: datetime, custom_ti
             time_bucket = '1 hour'
         elif days <= 32:
             time_bucket = '2 hours'
-        else:
+        elif days <= 90:
             time_bucket = '1 day'
+        else:
+            time_bucket = '7 days'
     else:
         time_bucket = custom_time_bucket
 
