@@ -1,13 +1,14 @@
 from datetime import datetime
 import sys
 from typing import List
-from flask import jsonify
+from flask import jsonify, request
 import requests
-from app.models.transportopendata import ParkingData, ParkingLot
+from app.models.transportopendata import ParkingData, ParkingLot, query_parking_data
 from app.transportopendata import bp
 from app.extensions import db, roles_required, limiter
 from config import Config
 from zoneinfo import ZoneInfo
+from app.analytics.routes import parse_datetime
 
 API_KEY = f"apikey {Config.OPEN_DATA_TOKEN}"
 BASE_URL = "https://api.transport.nsw.gov.au/v1/carpark"
@@ -70,4 +71,29 @@ def post_parking_data():
 @bp.route('parking_data/<int:facility_id>', methods=['GET'])
 @limiter.limit('30/minute', override_defaults=True)
 def get_parking_data(facility_id):
-    pass
+    start = request.args.get('start_time')
+    end = request.args.get('end_time')
+
+    # Validate input parameters
+    if not start or not end:
+        return jsonify({"success": False, "error": "'start_time' and 'end_time' must be provided"}), 400
+
+    start_time = parse_datetime(start)
+    end_time = parse_datetime(end)
+
+    # Check if facility_id exists in ParkingLot table
+    facility = db.session.query(ParkingLot).filter_by(facility_id=facility_id).first()
+    if not facility:
+        return jsonify({"success": False, "error": "Facility ID not found"}), 404
+
+    # Query parking data
+    data = query_parking_data(facility_id, start_time=start_time, end_time=end_time, bucket_size="1 minute")
+
+    # Format response
+    response = {
+        "facility_id": facility_id,
+        "facility_name": facility.name,
+        "parking_data": data
+    }
+
+    return jsonify(response), 200

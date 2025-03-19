@@ -125,7 +125,6 @@ def parse_datetime(date_str: str):
         date_str = date_str.replace(" ", "+")
         # Parse the datetime string
         dt = parser.parse(date_str)
-        # dt = datetime.fromisoformat(date_str)
         # If the datetime object is not timezone-aware, set it to UTC
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=ZoneInfo("UTC"))

@@ -1,4 +1,5 @@
 from datetime import datetime
+import sys
 from marshmallow import fields
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from app.extensions import db, psycop_conn
@@ -45,7 +46,7 @@ def set_parking_data_table():
     cur.close()
     conn.close()
 
-def get_parking_data(start_time: datetime, end_time: datetime, bucket_size: str = '1 hour'):
+def query_parking_data(facility_id: int, start_time: datetime, end_time: datetime, bucket_size: str = '1 hour'):
     query = """
     SELECT
         time_bucket(%s, timestamp) AS bucket,
@@ -61,6 +62,28 @@ def get_parking_data(start_time: datetime, end_time: datetime, bucket_size: str 
     ORDER BY
         bucket;
     """
+
+    conn = psycop_conn()
+    cur = conn.cursor()
+    cur.execute(query, (bucket_size, facility_id, start_time, end_time))
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    # Format the results as a list of dictionaries
+    formatted_results = [
+        {
+            "time": bucket.isoformat(),  # Convert datetime to string
+            "spots": avg_spots,
+            "occupied": avg_total
+        }
+        for bucket, avg_spots, avg_total in results
+    ]
+
+    # print(json.dumps(formatted_results, indent=2), file=sys.stderr)  # Debugging output
+
+    return formatted_results
+
 
 
 class ParkingLotSchema(SQLAlchemyAutoSchema):
