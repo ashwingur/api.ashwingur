@@ -50,6 +50,12 @@ def set_parking_lots():
 @limiter.limit('10/minute', override_defaults=True)
 def post_parking_data():
     parking_lots: List[ParkingLot] = ParkingLot.query.all()
+    post_body = request.json
+
+    if 'password' not in post_body:
+            return jsonify({"success": False, 'error': 'password not provided'}), 400
+    if post_body['password'] != Config.PARKING_POST_PASSWORD:
+            return jsonify({"success": False, 'error': 'incorrect password'}), 400
 
     for parking_lot in parking_lots:
         response = requests.get(f"{BASE_URL}?facility={parking_lot.facility_id}", headers=headers)
@@ -59,7 +65,8 @@ def post_parking_data():
         timestamp = datetime.now(ZoneInfo("UTC"))
         facility_id = data["facility_id"]
         spots = data["spots"]
-        message_date = data["MessageDate"]
+        # Transform to sydney time zone date then to UTC for storage
+        message_date = datetime.fromisoformat(data["MessageDate"]).replace(tzinfo=ZoneInfo("Australia/Sydney")).astimezone(ZoneInfo("UTC"))
         total = data["occupancy"]["total"]
         parking_data = ParkingData(timestamp=timestamp, facility_id=facility_id, spots=spots, total=total, message_date=message_date)
         db.session.add(parking_data)

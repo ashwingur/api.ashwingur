@@ -48,7 +48,7 @@ def create_app(config_class=Config):
     from app.models.frontend_log import setup_frontend_logs_table
     setup_frontend_logs_table()
     from app.models.transportopendata import set_parking_data_table
-    set_parking_data_table()
+    # set_parking_data_table()
 
     # Initialise CORS for auth
     cors.init_app(app, resources={

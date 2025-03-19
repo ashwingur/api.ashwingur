@@ -8,6 +8,7 @@ from flask_login import login_required, current_user
 from app.models.weather_data import insert_sensor_data, get_sensor_data_between_timestamps, get_latest_single_sensor_data, get_sensor_stats_between_timestamps
 from app.extensions import roles_required
 from zoneinfo import ZoneInfo
+from config import Config
 
 @bp.route('', methods=['GET', 'POST'])
 @limiter.limit("30/minute", override_defaults=True)
@@ -38,8 +39,7 @@ def sensor_data():
 
         if 'password' not in data:
             return jsonify({"success": False, 'error': 'password not provided'}), 400
-        if data['password'] != os.environ.get('WEATHER_POST_PASSWORD'):
-            print(f'password: {data["password"]}, actual: {os.environ.get("WEATHER_POST_PASSWORD")}', file=sys.stderr)
+        if data['password'] != Config.WEATHER_POST_PASSWORD:
             return jsonify({"success": False, 'error': 'incorrect password'}), 400
 
 

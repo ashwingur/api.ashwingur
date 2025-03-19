@@ -14,4 +14,6 @@ class Config:
     IMGPROXY_KEY = os.environ.get("IMGPROXY_KEY")
     IMGPROXY_SALT = os.environ.get("IMGPROXY_SALT")
     OPEN_DATA_TOKEN = os.environ.get("OPEN_DATA_TOKEN")
+    PARKING_POST_PASSWORD = os.environ.get("PARKING_POST_PASSWORD")
+    WEATHER_POST_PASSWORD = os.environ.get("WEATHER_POST_PASSWORD")
 

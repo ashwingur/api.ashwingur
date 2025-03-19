@@ -80,8 +80,6 @@ def query_parking_data(facility_id: int, start_time: datetime, end_time: datetim
         for bucket, avg_spots, avg_total in results
     ]
 
-    # print(json.dumps(formatted_results, indent=2), file=sys.stderr)  # Debugging output
-
     return formatted_results
 
 
