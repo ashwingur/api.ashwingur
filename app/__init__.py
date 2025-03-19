@@ -6,6 +6,7 @@ from app.extensions import cors, db, limiter, login_manager, migrate, socketio
 from app.middleware import register_middlewares
 # Ensure the models are imported so its registered
 from app.models.frontend_log import FrontendLog
+from app.models.transportopendata import ParkingLot
 from app.models.media_reviews import (Genre, MediaReview, MediaReviewGenre,
                                       SubMediaReview,
                                       create_example_reviews_and_genres,
@@ -46,6 +47,8 @@ def create_app(config_class=Config):
     setup_request_logs_table()
     from app.models.frontend_log import setup_frontend_logs_table
     setup_frontend_logs_table()
+    from app.models.transportopendata import set_parking_data_table
+    set_parking_data_table()
 
     # Initialise CORS for auth
     cors.init_app(app, resources={
