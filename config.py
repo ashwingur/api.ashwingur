@@ -13,3 +13,5 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(days=60)
     IMGPROXY_KEY = os.environ.get("IMGPROXY_KEY")
     IMGPROXY_SALT = os.environ.get("IMGPROXY_SALT")
+    OPEN_DATA_TOKEN = os.environ.get("OPEN_DATA_TOKEN")
+

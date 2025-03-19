@@ -82,6 +82,10 @@ def create_app(config_class=Config):
     from app.mediareviews import bp as mediareviews_bp
     app.register_blueprint(mediareviews_bp, url_prefix='/mediareviews')
 
+    from app.transportopendata import bp as transportopendata_bp
+    app.register_blueprint(transportopendata_bp,
+                           url_prefix='/transportopendata')
+
     @app.errorhandler(429)
     def ratelimit_handler(e):
         return jsonify({"error": f"rate limit exceeded {e.description}"}), 429
