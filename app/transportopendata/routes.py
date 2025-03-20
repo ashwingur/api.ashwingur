@@ -3,7 +3,7 @@ import sys
 from typing import List
 from flask import jsonify, request
 import requests
-from app.models.transportopendata import ParkingData, ParkingLot, query_parking_data
+from app.models.transportopendata import ParkingData, ParkingLot, query_parking_data,query_min_and_max_parking
 from app.transportopendata import bp
 from app.extensions import db, roles_required, limiter
 from config import Config
@@ -105,7 +105,9 @@ def get_parking_data(facility_id):
         return jsonify({"success": False, "error": "Facility ID not found"}), 404
 
     # Query parking data
-    data = query_parking_data(facility_id, start_time=start_time, end_time=end_time)
+    data = query_parking_data(facility_id, start_time, end_time)
+
+    min_occupancy, max_occupancy = query_min_and_max_parking(facility_id, start_time, end_time)
 
     # Format response
     response = {
@@ -113,6 +115,8 @@ def get_parking_data(facility_id):
         "facility_name": facility.name,
         "capacity": facility.capacity,
         "latest_occupancy": facility.occupancy,
+        "min_occupancy": min_occupancy,
+        "max_occupancy": max_occupancy,
         "historical_data": data
     }
 

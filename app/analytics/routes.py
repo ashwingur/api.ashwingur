@@ -104,6 +104,8 @@ def sanitise_route(route: str) -> str:
         return '/MediaReviewsV2'
     elif '/MediaReviews' in path:
         return '/MediaReviews'
+    elif '/LiveCarPark' in path:
+        return '/LiveCarPark'
     return path
 
 

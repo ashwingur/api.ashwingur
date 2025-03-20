@@ -115,6 +115,29 @@ def query_parking_data(facility_id: int, start_time: datetime, end_time: datetim
 
     return formatted_results
 
+def query_min_and_max_parking(facility_id: int, start_time: datetime, end_time: datetime):
+    # Query for global min and max occupancy over the entire time range
+    query = """
+    SELECT
+        MIN(occupancy) AS min_occupancy,
+        MAX(occupancy) AS max_occupancy
+    FROM
+        parking_data
+    WHERE
+        facility_id = %s
+        AND timestamp >= %s AND timestamp <= %s;
+    """
+
+    # Run the global min/max query
+    conn = psycop_conn()
+    cur = conn.cursor()
+    cur.execute(query, (facility_id, start_time, end_time))
+    min_max_result = cur.fetchone()
+    min_occupancy = min_max_result[0]
+    max_occupancy = min_max_result[1]
+
+    return (min_occupancy, max_occupancy)
+
 
 
 class ParkingLotSchema(SQLAlchemyAutoSchema):
