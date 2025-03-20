@@ -112,7 +112,7 @@ def get_parking_data(facility_id):
         "facility_id": facility_id,
         "facility_name": facility.name,
         "capacity": facility.capacity,
-        "occupancy": facility.occupancy,
+        "latest_occupancy": facility.occupancy,
         "historical_data": data
     }
 
