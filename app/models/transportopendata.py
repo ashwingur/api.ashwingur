@@ -11,6 +11,8 @@ class ParkingLot(db.Model):
     
     facility_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
+    capacity = db.Column(db.Integer, nullable=False)
+    occupancy = db.Column(db.Integer, nullable=False)
 
     def __repr__(self):
         return f"<ParkingLot(parking_id={self.facility_id}, name={self.name})>"
@@ -21,9 +23,7 @@ class ParkingData(db.Model):
     timestamp = db.Column(db.DateTime(timezone=True),
                           primary_key=True, nullable=False, default=datetime.now(tz=ZoneInfo("UTC")))
     facility_id = db.Column(db.Integer, db.ForeignKey('parking_lots.facility_id'), nullable=False)
-    spots = db.Column(db.Integer, nullable=False)
-    total = db.Column(db.Integer, nullable=False)
-    message_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    occupancy = db.Column(db.Integer, nullable=False)
 
     # Relationship to the existing ParkingLot model
     facility = db.relationship('ParkingLot', backref=db.backref('parking_data', lazy=True))
@@ -41,6 +41,13 @@ def set_parking_data_table():
     """
     cur.execute(create_hypertable_query)
 
+    # Create index if it doesn't exist
+    index_creation_query = """
+        CREATE INDEX IF NOT EXISTS idx_parking_data_facility_id_timestamp 
+        ON parking_data (facility_id, timestamp DESC);
+    """
+    cur.execute(index_creation_query)   
+
     # Commit the changes and close the connection
     conn.commit()
     cur.close()
@@ -50,8 +57,7 @@ def query_parking_data(facility_id: int, start_time: datetime, end_time: datetim
     query = """
     SELECT
         time_bucket(%s, timestamp) AS bucket,
-        ROUND(AVG(spots)::numeric, 3)::float AS avg_spots,
-        ROUND(AVG(total)::numeric, 3)::float AS avg_total
+        ROUND(AVG(occupancy))::INTEGER AS occupancy
     FROM
         parking_data
     WHERE
@@ -74,10 +80,9 @@ def query_parking_data(facility_id: int, start_time: datetime, end_time: datetim
     formatted_results = [
         {
             "time": bucket.isoformat(),  # Convert datetime to string
-            "spots": avg_spots,
-            "occupied": avg_total
+            "occupied": occupancy
         }
-        for bucket, avg_spots, avg_total in results
+        for bucket, occupancy in results
     ]
 
     return formatted_results

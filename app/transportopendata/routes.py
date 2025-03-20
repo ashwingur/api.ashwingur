@@ -34,12 +34,25 @@ def set_parking_lots():
             # Skip IDs 5 and lower because they are historical only
             if int(facility_id) <= 5:
                 continue
+            
+            # Query for to get the latest capacity and spots
+            parking_data_response = requests.get(f"{BASE_URL}?facility={facility_id}", headers=headers)
+            if parking_data_response.status_code != 200:
+                 continue
+            
+            parking_data = parking_data_response.json()
+            
+            occupancy = parking_data["occupancy"]["total"]
+            capacity = parking_data["spots"]
+
             # Check if the parking lot exists
             parking_lot = db.session.query(ParkingLot).filter_by(facility_id=facility_id).first()
             if parking_lot:
                 parking_lot.name = name
+                parking_lot.occupancy = occupancy
+                parking_lot.capacity = capacity
             else:
-                parking_lot = ParkingLot(facility_id=int(facility_id), name=name)
+                parking_lot = ParkingLot(facility_id=int(facility_id), name=name, occupancy=occupancy, capacity=capacity)
                 db.session.add(parking_lot)
             db.session.commit()
         return jsonify(response.json())  # Return the JSON response
@@ -63,12 +76,9 @@ def post_parking_data():
             continue
         data = response.json()
         timestamp = datetime.now(ZoneInfo("UTC"))
-        facility_id = data["facility_id"]
-        spots = data["spots"]
-        # Transform to sydney time zone date then to UTC for storage
-        message_date = datetime.fromisoformat(data["MessageDate"]).replace(tzinfo=ZoneInfo("Australia/Sydney")).astimezone(ZoneInfo("UTC"))
-        total = data["occupancy"]["total"]
-        parking_data = ParkingData(timestamp=timestamp, facility_id=facility_id, spots=spots, total=total, message_date=message_date)
+        facility_id = data["facility_id"]  
+        occupancy = data["occupancy"]["total"]
+        parking_data = ParkingData(timestamp=timestamp, facility_id=facility_id, occupancy=occupancy)
         db.session.add(parking_data)
         db.session.commit()
     
@@ -100,6 +110,7 @@ def get_parking_data(facility_id):
     response = {
         "facility_id": facility_id,
         "facility_name": facility.name,
+        "capacity": facility.capacity,
         "parking_data": data
     }
 
