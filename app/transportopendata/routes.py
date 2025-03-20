@@ -56,7 +56,7 @@ def set_parking_lots():
                 parking_lot = ParkingLot(facility_id=int(facility_id), name=name, occupancy=occupancy, capacity=capacity)
                 db.session.add(parking_lot)
             db.session.commit()
-        return jsonify(jsonify([lot.to_dict() for lot in ParkingLot.query.all()]))  # Return the JSON response
+        return jsonify([lot.to_dict() for lot in ParkingLot.query.all()])
     else:
         return jsonify({"error": f"Request failed with status {response.status_code}", "details": response.text}), response.status_code
     
