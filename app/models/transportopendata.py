@@ -53,7 +53,27 @@ def set_parking_data_table():
     cur.close()
     conn.close()
 
-def query_parking_data(facility_id: int, start_time: datetime, end_time: datetime, bucket_size: str = '1 hour'):
+def query_parking_data(facility_id: int, start_time: datetime, end_time: datetime, bucket_size: str|None = None):
+    if bucket_size is None:
+        days = (end_time - start_time).days
+        if days <= 2:
+            time_bucket = '5 minutes'
+        elif days <= 4:
+            time_bucket = '15 minutes'
+        elif days <= 7:
+            time_bucket = '30 minutes'
+        elif days <= 14:
+            time_bucket = '1 hour'
+        elif days <= 32:
+            time_bucket = '2 hours'
+        elif days <= 90:
+            time_bucket = '1 day'
+        else:
+            time_bucket = '7 days'
+    else:
+        time_bucket = bucket_size
+
+
     query = """
     SELECT
         time_bucket(%s, timestamp) AS bucket,
@@ -71,7 +91,7 @@ def query_parking_data(facility_id: int, start_time: datetime, end_time: datetim
 
     conn = psycop_conn()
     cur = conn.cursor()
-    cur.execute(query, (bucket_size, facility_id, start_time, end_time))
+    cur.execute(query, (time_bucket, facility_id, start_time, end_time))
     results = cur.fetchall()
     cur.close()
     conn.close()

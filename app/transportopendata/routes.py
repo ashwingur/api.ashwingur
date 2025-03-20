@@ -16,13 +16,8 @@ headers = {
     "Authorization": API_KEY,
 }
 
-@bp.route('', methods=['GET'])
-@limiter.limit('40/minute', override_defaults=True)
-def test():
-    return "Test works"
-
 @bp.route('set_parking_lots', methods=['POST'])
-@limiter.limit('20/minute', override_defaults=True)
+@limiter.limit('4/minute', override_defaults=True)
 def set_parking_lots():
     '''
     Calls the baseurl of the parking API to get a list of parking lots and updates the table accordingly
@@ -104,7 +99,7 @@ def get_parking_data(facility_id):
         return jsonify({"success": False, "error": "Facility ID not found"}), 404
 
     # Query parking data
-    data = query_parking_data(facility_id, start_time=start_time, end_time=end_time, bucket_size="1 minute")
+    data = query_parking_data(facility_id, start_time=start_time, end_time=end_time)
 
     # Format response
     response = {
