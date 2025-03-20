@@ -14,6 +14,14 @@ class ParkingLot(db.Model):
     capacity = db.Column(db.Integer, nullable=False)
     occupancy = db.Column(db.Integer, nullable=False)
 
+    def to_dict(self):
+        return {
+            "facility_id": self.facility_id,
+            "name": self.name,
+            "capacity": self.capacity,
+            "occupancy": self.occupancy
+        }
+
     def __repr__(self):
         return f"<ParkingLot(parking_id={self.facility_id}, name={self.name})>"
 

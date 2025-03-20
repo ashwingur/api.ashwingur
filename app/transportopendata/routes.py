@@ -16,6 +16,12 @@ headers = {
     "Authorization": API_KEY,
 }
 
+@bp.route('', methods=['GET'])
+@limiter.limit('40/minute', override_defaults=True)
+def get_latest_parking():
+    parking_lots = ParkingLot.query.all()
+    return jsonify([lot.to_dict() for lot in parking_lots])
+
 @bp.route('set_parking_lots', methods=['POST'])
 @limiter.limit('4/minute', override_defaults=True)
 def set_parking_lots():
@@ -50,7 +56,7 @@ def set_parking_lots():
                 parking_lot = ParkingLot(facility_id=int(facility_id), name=name, occupancy=occupancy, capacity=capacity)
                 db.session.add(parking_lot)
             db.session.commit()
-        return jsonify(response.json())  # Return the JSON response
+        return jsonify(jsonify([lot.to_dict() for lot in ParkingLot.query.all()]))  # Return the JSON response
     else:
         return jsonify({"error": f"Request failed with status {response.status_code}", "details": response.text}), response.status_code
     
