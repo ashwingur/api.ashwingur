@@ -106,7 +106,8 @@ def get_parking_data(facility_id):
         "facility_id": facility_id,
         "facility_name": facility.name,
         "capacity": facility.capacity,
-        "parking_data": data
+        "occupancy": facility.occupancy,
+        "historical_data": data
     }
 
     return jsonify(response), 200
