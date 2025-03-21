@@ -3,7 +3,7 @@ import sys
 from typing import List
 from flask import jsonify, request
 import requests
-from app.models.transportopendata import ParkingData, ParkingLot, query_parking_data,query_min_and_max_parking
+from app.models.transportopendata import ParkingData, ParkingLot, query_parking_data,query_min_and_max_parking, ServiceInfoSchema, InfosSchema
 from app.transportopendata import bp
 from app.extensions import db, roles_required, limiter
 from config import Config
@@ -121,3 +121,27 @@ def get_parking_data(facility_id):
     }
 
     return jsonify(response), 200
+
+@bp.route('service_info', methods=['GET'])
+@limiter.limit('30/minute', override_defaults=True)
+def get_service_info():
+    lines = request.args.getlist('line')
+
+    SERVICE_INFO_URL = "https://api.transport.nsw.gov.au/v1/tp/add_info"
+
+    params = {
+         "version": "10.2.2.48",
+         "itdLPxx_selLine": lines,
+         "filterPublicationStatus": "current"
+    }
+
+    response = requests.get(SERVICE_INFO_URL, params=params, headers=headers)
+
+    if response.status_code != 200:
+        return jsonify({"error": "Failed to fetch service info"}), response.status_code
+    
+    schema = ServiceInfoSchema()
+    data = schema.load(response.json())
+    return_schema = InfosSchema()
+
+    return jsonify(return_schema.dump(data.get("infos", {})))

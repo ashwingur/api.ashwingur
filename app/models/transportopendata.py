@@ -1,6 +1,6 @@
 from datetime import datetime
 import sys
-from marshmallow import fields
+from marshmallow import Schema, fields, EXCLUDE
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from app.extensions import db, psycop_conn
 from zoneinfo import ZoneInfo
@@ -150,3 +150,65 @@ class ParkingDataSchema(SQLAlchemyAutoSchema):
     spots = fields.Int(required=True)
     total = fields.Int(required=True)
     message_date = fields.DateTime(required=True)
+
+
+'''
+Schema for service alerts in Sydney transport
+'''
+# Schema for timestamps
+class AvailabilitySchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    from_ = fields.DateTime(data_key="from", required=True)
+    to = fields.DateTime(required=True)
+
+class ValiditySchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    from_ = fields.DateTime(data_key="from", required=True)
+    to = fields.DateTime(required=True)
+
+class TimestampsSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    availability = fields.Nested(AvailabilitySchema, required=True)
+    validity = fields.List(fields.Nested(ValiditySchema), required=True)
+    expiration = fields.DateTime(required=True)
+
+# Schema for affected lines
+class AffectedLineSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    name = fields.String(required=True)
+    number = fields.String(required=True)
+    description = fields.String(required=True)
+
+class AffectedSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    lines = fields.List(fields.Nested(AffectedLineSchema), required=True)
+
+# Schema for each info item
+class InfoItemSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    type = fields.String(required=True)
+    priority = fields.String(required=True)
+    timestamps = fields.Nested(TimestampsSchema, required=True)
+    urlText = fields.String(required=True)
+    url = fields.String(required=True)
+    affected = fields.Nested(AffectedSchema, required=True)
+
+# Schema for the main structure
+class InfosSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE    
+    current = fields.List(fields.Nested(InfoItemSchema), required=True)
+
+class ServiceInfoSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
+    version = fields.String(required=True)
+    timestamp = fields.DateTime(required=True)
+    infos = fields.Nested(InfosSchema, required=True)
