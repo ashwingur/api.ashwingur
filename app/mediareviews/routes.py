@@ -186,6 +186,10 @@ def get_metadata():
 
     total_run_time = sum(run_time for _, _, _, run_time,
                          _ in media_reviews if run_time is not None)
+    
+    # Get the counts of MediaReview and SubMediaReview
+    media_review_count = len(media_reviews)
+    sub_media_review_count = len(sub_media_reviews)
 
     return jsonify({
         'creators': creators_list,
@@ -194,7 +198,9 @@ def get_metadata():
         'rating_bins': rating_bins,
         'rating_bins_with_sub_reviews': rating_bins_with_sub_reviews,
         'total_word_count': total_word_count,
-        'total_run_time': total_run_time
+        'total_run_time': total_run_time,
+        'media_review_count': media_review_count,
+        'sub_media_review_count': sub_media_review_count
     })
 
 
