@@ -78,8 +78,9 @@ class CocPlayerDataSchema(SQLAlchemyAutoSchema):
         include_fk = True  # Include foreign keys if needed
         unknown = 'exclude'  # Ignore extra keys from API response
         sqla_session = db.session
+        exclude = ("id",) # Dont serialise this
 
-    id = fields.Integer(dump_only=True)
+    # id = fields.Integer(dump_only=True)
 
     # Automatically convert snake_case to camelCase for serialization
     def on_bind_field(self, field_name, field_obj):
