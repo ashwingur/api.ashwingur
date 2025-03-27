@@ -32,6 +32,7 @@ services:
       - IMGPROXY_SALT=${IMGPROXY_SALT}
       - FLASK_ENV=${FLASK_ENV}
       - OPEN_DATA_TOKEN=${OPEN_DATA_TOKEN}
+      - COC_BEARER_TOKEN=${COC_BEARER_TOKEN}
     depends_on:
       - flask_db
       - flask_redis

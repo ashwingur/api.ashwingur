@@ -7,16 +7,16 @@ from app.middleware import register_middlewares
 # Ensure the models are imported so its registered
 from app.models.frontend_log import FrontendLog
 from app.models.transportopendata import ParkingLot
+from app.models.clashofclans import CocPlayerData
 from app.models.media_reviews import (Genre, MediaReview, MediaReviewGenre,
                                       SubMediaReview,
                                       create_example_reviews_and_genres,
-                                      initialise_media_reviews)
+                                      initialise_media_reviews,)
 from app.models.post import Post
 from app.models.request_log import RequestLog
 from app.models.user import create_admin_user
 from app.models.weather_data import SensorData
 from config import Config
-
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -88,6 +88,10 @@ def create_app(config_class=Config):
     from app.transportopendata import bp as transportopendata_bp
     app.register_blueprint(transportopendata_bp,
                            url_prefix='/transportopendata')
+
+    from app.clashofclans import bp as clashofclans_bp
+    app.register_blueprint(clashofclans_bp,
+                           url_prefix='/clashofclans')
 
     @app.errorhandler(429)
     def ratelimit_handler(e):
