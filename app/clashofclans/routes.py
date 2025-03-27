@@ -22,12 +22,19 @@ def set_player_data():
     '''
     Logs player data of a given clan
     '''
+    post_body = request.json
+
+    if 'password' not in post_body:
+            return jsonify({"success": False, 'error': 'password not provided'}), 400
+    if post_body['password'] != Config.PARKING_POST_PASSWORD:
+            return jsonify({"success": False, 'error': 'incorrect password'}), 400
+
 
     # Fetch clan data
     clan_response = requests.get(f"{BASE_URL}/clans/%23220QP2GGU", headers=headers)
 
     if clan_response.status_code != 200:
-        return jsonify({"error": clan_response.json().get("message")}), clan_response.status_code
+        return jsonify({"success": False, "error": clan_response.json().get("message")}), clan_response.status_code
 
     clan_data = clan_response.json()
     player_list = [player.get("tag") for player in clan_data["memberList"]]
