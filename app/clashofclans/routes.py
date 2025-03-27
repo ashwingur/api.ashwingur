@@ -27,11 +27,10 @@ def set_player_data():
     clan_response = requests.get(f"{BASE_URL}/clans/%23220QP2GGU", headers=headers)
 
     if clan_response.status_code != 200:
-        return jsonify({"success": False}), clan_response.status_code
+        return jsonify({"error": clan_response.json().get("message")}), clan_response.status_code
 
     clan_data = clan_response.json()
     player_list = [player.get("tag") for player in clan_data["memberList"]]
-    # player_list = ["#YLPGLJ0V"]
 
     for player in clan_data["memberList"]:
         tag = player["tag"]
