@@ -109,14 +109,16 @@ def set_player_data():
 def get_player_data(tag):
     '''
     Retrieve player data by tag.
-    Optionally filter by start_date and end_date with timezone support.
+    Optionally filter by start and end with timezone support.
     If no dates are provided, fetch records from one year ago until now.
     '''
     
     # Parse start_date and end_date, ensuring timezone support
     try:
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
+        start_date = request.args.get('start').replace(" ", "+")
+        end_date = request.args.get('end').replace(" ", "+")
+
+        print(start_date, file=sys.stderr)
 
         if start_date:
             start_date = datetime.fromisoformat(start_date)  # Parses timezone if provided
