@@ -118,8 +118,6 @@ def get_player_data(tag):
         start_date = request.args.get('start')
         end_date = request.args.get('end')
 
-        print(start_date, file=sys.stderr)
-
         if start_date:
             start_date = parser.parse(start_date)
         else:
