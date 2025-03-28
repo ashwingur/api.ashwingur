@@ -9,6 +9,7 @@ from app.clashofclans import bp
 from app.extensions import db, limiter
 from config import Config
 from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer
+from dateutil import parser
 
 BASE_URL = "https://cocproxy.royaleapi.dev/v1"
 headers = {
@@ -113,28 +114,21 @@ def get_player_data(tag):
     If no dates are provided, fetch records from one year ago until now.
     '''
     
-    # Parse start_date and end_date, ensuring timezone support
     try:
-        start_date = request.args.get('start').replace(" ", "+")
-        end_date = request.args.get('end').replace(" ", "+")
+        start_date = request.args.get('start')
+        end_date = request.args.get('end')
 
         print(start_date, file=sys.stderr)
 
         if start_date:
-            start_date = datetime.fromisoformat(start_date)  # Parses timezone if provided
+            start_date = parser.parse(start_date)
         else:
             start_date = datetime.now(ZoneInfo("UTC")) - timedelta(days=365)  # Default: 1 year ago (UTC)
 
         if end_date:
-            end_date = datetime.fromisoformat(end_date)  # Parses timezone if provided
+            end_date = parser.parse(end_date)  # Parses timezone if provided
         else:
             end_date = datetime.now(ZoneInfo("UTC"))  # Default: now (UTC)
-
-        # Convert to UTC if timezone exists, otherwise assume UTC
-        if start_date.tzinfo is None:
-            start_date = start_date.replace(tzinfo=ZoneInfo("UTC"))
-        if end_date.tzinfo is None:
-            end_date = end_date.replace(tzinfo=ZoneInfo("UTC"))
 
     except ValueError:
         return jsonify({"error": "Invalid datetime format. Use ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM)"}), 400
