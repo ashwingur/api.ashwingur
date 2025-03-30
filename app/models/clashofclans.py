@@ -29,7 +29,7 @@ class CocPlayerData(db.Model):
     clan_capital_contributions = db.Column(db.Integer, nullable=False)
 
     """
-    [{"name" : "Barbarian","level" : 10}]
+    [{"name" : "Barbarian", "level" : 10}]
     """
     troops = db.Column(JSONB, nullable=False)
     heroes = db.Column(JSONB, nullable=False)
@@ -53,7 +53,7 @@ class CocPlayer(db.Model):
     name = db.Column(db.String(20), nullable=False)
 
 
-class PlayerDataItemLevelSchema(SQLAlchemyAutoSchema):
+class PlayerDataItemLevelSchema(Schema):
     name = fields.String(required=True)
     level = fields.Integer(required=True)
 
@@ -62,7 +62,7 @@ class PlayerDataItemLevelSchema(SQLAlchemyAutoSchema):
         # Only keep 'name' and 'level'
         return {key: data[key] for key in ["name", "level"] if key in data}
 
-class PlayerDataAchievementsSchema(SQLAlchemyAutoSchema):
+class PlayerDataAchievementsSchema(Schema):
     name = fields.String(required=True)
     value = fields.Integer(required=True)
 
@@ -80,16 +80,14 @@ class CocPlayerDataSchema(SQLAlchemyAutoSchema):
         sqla_session = db.session
         exclude = ("id",) # Dont serialise this
 
-    # id = fields.Integer(dump_only=True)
-
     # Automatically convert snake_case to camelCase for serialization
     def on_bind_field(self, field_name, field_obj):
         camel_case_name = re.sub(r'_([a-z])', lambda x: x.group(1).upper(), field_name)
         field_obj.data_key = camel_case_name
 
-    troops = fields.List(fields.Nested(PlayerDataItemLevelSchema), data_key="troops")
-    heroes = fields.List(fields.Nested(PlayerDataItemLevelSchema), data_key="heroes")
-    spells = fields.List(fields.Nested(PlayerDataItemLevelSchema), data_key="spells")
+    troops = fields.List(fields.Nested(PlayerDataItemLevelSchema))
+    heroes = fields.List(fields.Nested(PlayerDataItemLevelSchema))
+    spells = fields.List(fields.Nested(PlayerDataItemLevelSchema))
     hero_equipment = fields.List(fields.Nested(PlayerDataItemLevelSchema), data_key="heroEquipment")
-    achievements = fields.List(fields.Nested(PlayerDataAchievementsSchema), data_key="achievements")
+    achievements = fields.List(fields.Nested(PlayerDataAchievementsSchema))
 

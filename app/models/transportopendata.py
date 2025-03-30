@@ -133,8 +133,8 @@ def query_min_and_max_parking(facility_id: int, start_time: datetime, end_time: 
     cur = conn.cursor()
     cur.execute(query, (facility_id, start_time, end_time))
     min_max_result = cur.fetchone()
-    min_occupancy = min_max_result[0]
-    max_occupancy = min_max_result[1]
+    min_occupancy = min_max_result[0] or 0
+    max_occupancy = min_max_result[1] or 0
 
     return (min_occupancy, max_occupancy)
 
