@@ -106,7 +106,7 @@ def set_player_data():
 
 
 @bp.route('/player_data/<string:tag>', methods=['GET'])
-@limiter.limit('15/minute', override_defaults=True)
+@limiter.limit('30/minute', override_defaults=True)
 def get_player_data(tag):
     '''
     Retrieve player data by tag.
@@ -151,4 +151,13 @@ def get_player_data(tag):
     return jsonify({"name": player.name, "tag": player.tag,"history": schema.dump(player_data)}), 200
 
 
+@bp.route('/goldpass', methods=['GET'])
+@limiter.limit('40/minute', override_defaults=True)
+def gold_pass():
+    gold_response = requests.get(f"{BASE_URL}/goldpass/seasons/current", headers=headers)
+
+    if gold_response.status_code != 200:
+        return jsonify({"success": False, "error": gold_response.json().get("message")}), gold_response.status_code
+
+    return jsonify(gold_response.json()), 200
 
