@@ -94,3 +94,7 @@ class CocPlayerDataSchema(SQLAlchemyAutoSchema):
     hero_equipment = fields.List(fields.Nested(PlayerDataItemLevelSchema), data_key="heroEquipment")
     achievements = fields.List(fields.Nested(PlayerDataAchievementsSchema))
 
+class CocPlayerSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = CocPlayer
+        load_instance = True

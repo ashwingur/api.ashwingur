@@ -8,7 +8,7 @@ from sqlalchemy import and_
 from app.clashofclans import bp
 from app.extensions import db, limiter, get_real_ip
 from config import Config
-from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer
+from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer, CocPlayerSchema
 from dateutil import parser
 
 BASE_URL = "https://cocproxy.royaleapi.dev/v1"
@@ -170,6 +170,25 @@ def increment_view_count(tag):
     else:
         return jsonify({"success": False, "error": "Player not found"}), 404
 
+@bp.route('/players', methods=['GET'])
+@limiter.limit('40/minute', override_defaults=True)
+def get_players():
+    players = CocPlayer.query.all()
+    schema = CocPlayerSchema(many=True)
+    return jsonify(schema.dump(players)), 200
+
+@bp.route('/players/<string:tag>', methods=['GET'])
+@limiter.limit('40/minute', override_defaults=True)
+def get_player_by_tag(tag):
+    player = CocPlayer.query.get(tag)
+
+    if player is None:
+        return jsonify({"error": "Player not found"}), 404
+
+    schema = CocPlayerSchema()
+    return jsonify(schema.dump(player)), 200
+
+
 @bp.route('/goldpass', methods=['GET'])
 @limiter.limit('40/minute', override_defaults=True)
 def gold_pass():
@@ -179,4 +198,5 @@ def gold_pass():
         return jsonify({"success": False, "error": gold_response.json().get("message")}), gold_response.status_code
 
     return jsonify(gold_response.json()), 200
+
 
