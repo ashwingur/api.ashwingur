@@ -158,7 +158,7 @@ def get_player_data(tag):
     return jsonify({"name": player.name, "view_count": player.view_count, "clan_tag": player.clan_tag, "clan_name": player.clan_name, "tag": player.tag,"history": schema.dump(player_data)}), 200
 
 @bp.route('/player_data/increment_view_count/<string:tag>', methods=['PATCH'])
-@limiter.limit('1/5minute', key_func=lambda: (request.remote_addr, request.view_args['tag']), override_defaults=True)
+@limiter.limit('1/5minute', key_func=lambda: f"{request.remote_addr}:{request.view_args['tag']}", override_defaults=True)
 def increment_view_count(tag):
     player = CocPlayer.query.get(tag)
     
