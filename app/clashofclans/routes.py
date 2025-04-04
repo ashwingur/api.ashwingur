@@ -38,7 +38,6 @@ def set_player_data():
         return jsonify({"success": False, "error": clan_response.json().get("message")}), clan_response.status_code
 
     clan_data = clan_response.json()
-    player_list = [player.get("tag") for player in clan_data["memberList"]]
 
     for player in clan_data["memberList"]:
         tag = player["tag"]
@@ -50,11 +49,13 @@ def set_player_data():
             if existing_player.name != name:
                 existing_player.name = name
         else:
-            new_player = CocPlayer(tag=tag, name=name)
+            new_player = CocPlayer(tag=tag, name=name, clan_tag=clan_data["tag"], view_count=0)
             db.session.add(new_player)
 
     # Commit after processing all players
     db.session.commit()
+
+    all_players = CocPlayer.query.all()
 
 
     # Get the current Flask app context
@@ -73,6 +74,12 @@ def set_player_data():
 
                 if player_response.status_code != 200:
                     return None
+                
+                player = session.query(CocPlayer).get(tag)
+                if player_response.json().get("clan"):
+                    player.clan_tag = player_response.json()["clan"]["tag"]
+                    player.clan_name = player_response.json()["clan"]["name"]
+                    
 
                 data = player_response.json()
                 schema = CocPlayerDataSchema()
@@ -92,7 +99,7 @@ def set_player_data():
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # Submit tasks for each player in parallel, passing the app instance
-        futures = [executor.submit(process_player, tag, app) for tag in player_list]
+        futures = [executor.submit(process_player, p.tag, app) for p in all_players]
 
         # Wait for all futures to complete and handle the results
         for future in concurrent.futures.as_completed(futures):
@@ -148,8 +155,20 @@ def get_player_data(tag):
 
     # Serialize results
     schema = CocPlayerDataSchema(many=True)
-    return jsonify({"name": player.name, "tag": player.tag,"history": schema.dump(player_data)}), 200
+    return jsonify({"name": player.name, "view_count": player.view_count, "clan_tag": player.clan_tag, "clan_name": player.clan_name, "tag": player.tag,"history": schema.dump(player_data)}), 200
 
+@bp.route('/player_data/increment_view_count/<string:tag>', methods=['PATCH'])
+@limiter.limit('1/5minute', key_func=lambda: (request.remote_addr, request.view_args['tag']), override_defaults=True)
+def increment_view_count(tag):
+    player = CocPlayer.query.get(tag)
+    
+    if player:
+        player.view_count += 1
+        db.session.commit()
+        
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"success": False, "error": "Player not found"}), 404
 
 @bp.route('/goldpass', methods=['GET'])
 @limiter.limit('40/minute', override_defaults=True)

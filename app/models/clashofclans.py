@@ -51,6 +51,9 @@ class CocPlayer(db.Model):
 
     tag = db.Column(db.String(15), primary_key=True, nullable=False)
     name = db.Column(db.String(20), nullable=False)
+    clan_tag = db.Column(db.String(15), nullable=True)
+    clan_name = db.Column(db.String(20), nullable=True)
+    view_count = db.Column(db.Integer, nullable=False, default=0)
 
 
 class PlayerDataItemLevelSchema(Schema):
