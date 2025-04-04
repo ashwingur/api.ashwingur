@@ -6,7 +6,7 @@ from flask import jsonify, request, current_app
 import requests
 from sqlalchemy import and_
 from app.clashofclans import bp
-from app.extensions import db, limiter
+from app.extensions import db, limiter, get_real_ip
 from config import Config
 from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer
 from dateutil import parser
@@ -158,7 +158,7 @@ def get_player_data(tag):
     return jsonify({"name": player.name, "view_count": player.view_count, "clan_tag": player.clan_tag, "clan_name": player.clan_name, "tag": player.tag,"history": schema.dump(player_data)}), 200
 
 @bp.route('/player_data/increment_view_count/<string:tag>', methods=['PATCH'])
-@limiter.limit('1/5minute', key_func=lambda: f"{request.remote_addr}:{request.view_args['tag']}", override_defaults=True)
+@limiter.limit('1/5minute', key_func=lambda: f"{get_real_ip()}:{request.view_args.get('tag', 'UNKNOWN')}", override_defaults=True)
 def increment_view_count(tag):
     player = CocPlayer.query.get(tag)
     
