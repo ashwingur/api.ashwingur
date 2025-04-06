@@ -201,7 +201,7 @@ def gold_pass():
 
 
 @bp.route('/fullclan/<string:tag>', methods=['GET'])
-@limiter.limit('30/minute', override_defaults=True)
+@limiter.limit('15/minute', override_defaults=True)
 def get_full_clan_data(tag):
     """
     Gets all relevant clan data and combines it together in the members
@@ -398,21 +398,12 @@ def get_full_clan_data(tag):
                     "clan": clan_name,
                     "clan_tag": clan_tag,
                     "opponent": opponent,
-                    "opponent_tag": opponent_tag
+                    "opponent_tag": opponent_tag,
+                    "state": war.get("state")
                 })
             clan["cwl_war_rounds"] = cwl_war_rounds
         else:
             clan["cwl_war_rounds"] = None
-
-                    
-            
-
-
-
-    
-
-
-
 
     return jsonify(clan), 200
 
