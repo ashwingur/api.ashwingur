@@ -304,7 +304,7 @@ def get_full_clan_data(tag):
             member["war"] = None
 
         
-        # Go through each cwl
+        # Go through each cwl to aggregate each player's stats in this clan
         tag = tag.replace("%23", "#")
         if cwl_wars:
             attacks = 0
@@ -375,7 +375,7 @@ def get_full_clan_data(tag):
         if cwl_wars:
             cwl_war_rounds = []
             for war in cwl_wars:
-                war_tag = war.get("war_tag")
+                war_tag = war.get("war_tag").replace("%23","#")
                 if war.get("opponent").get("tag") == tag:
                     opponent = war.get("clan").get("name")
                     opponent_tag = war.get("clan").get("tag")
@@ -387,12 +387,6 @@ def get_full_clan_data(tag):
                     clan_name = war.get("clan").get("name")
                     clan_tag = war.get("clan").get("tag")                    
 
-                # if war.get("clan").get("tag") == tag:
-                #     opponent = war.get("opponent").get("name")
-                #     opponent_tag = war.get("opponent").get("tag")
-
-                # else:
-                #     continue
                 cwl_war_rounds.append({
                     "war_tag": war_tag,
                     "clan": clan_name,
