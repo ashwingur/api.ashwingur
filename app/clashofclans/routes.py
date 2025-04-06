@@ -89,7 +89,6 @@ def set_player_data():
 
                 session.add(player_data)
                 session.commit()
-                # print(f"committed {tag}", file=sys.stderr)
                 return tag  # Return tag after processing
             except Exception as e:
                 session.rollback()
@@ -239,6 +238,14 @@ def get_full_clan_data(tag):
         leaguegroup_data = leaguegroup_response.json()
     
     # If leaguegroup exists then fetch all CWL wars
+    def fetchCWLWar(url, war_tag):
+        response = requests.get(url, headers=headers)
+        if response.ok:
+            data = response.json()
+            data["war_tag"] = war_tag
+            return data
+        else:
+            return None
     cwl_wars = None
     if leaguegroup_data:
         cwl_war_tags = []
@@ -247,10 +254,11 @@ def get_full_clan_data(tag):
                 if war_tag != "#0":
                     cwl_war_tags.append(war_tag.replace("#", "%23"))
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(fetch, f"{BASE_URL}/clanwarleagues/wars/{war_tag}") for war_tag in cwl_war_tags]
-            cwl_wars = [f.result().json() for f in futures 
-                                 if f.result() and f.result().ok]
-            print(cwl_wars, file=sys.stderr)
+            futures = [executor.submit(fetchCWLWar, f"{BASE_URL}/clanwarleagues/wars/{war_tag}", war_tag) for war_tag in cwl_war_tags]
+            cwl_wars = [f.result() for f in futures 
+                                 if f.result()]
+            # Keeping it sorted in order is good
+            cwl_wars.sort(key=lambda x: datetime.strptime(x["startTime"], "%Y%m%dT%H%M%S.%fZ"))
         
 
 
@@ -297,12 +305,18 @@ def get_full_clan_data(tag):
 
         
         # Go through each cwl
+        tag = tag.replace("%23", "#")
         if cwl_wars:
             attacks = 0
             attack_limit = 0
             total_destruction = 0
             total_stars = 0
             total_duration = 0
+            attack_todo = False
+            defends = 0
+            defends_stars = 0
+            defends_total_destruction = 0
+            defends_total_duration = 0
             for war in cwl_wars:
                 # If it's preparation then skip
                 if war.get("state") == "preparation":
@@ -321,12 +335,24 @@ def get_full_clan_data(tag):
                 # War state can be inWar or warEnded
                 if war_player:
                     attack_limit += 1
-                    if len(war_player.get("attacks")) == 1:
+                    if war_player.get("attacks") and len(war_player.get("attacks")) == 1:
                         attack_info = war_player.get("attacks")[0]
                         attacks += 1
                         total_destruction += attack_info.get("destructionPercentage")
                         total_stars += attack_info.get("stars")
                         total_duration += attack_info.get("duration")
+                    elif war.get("state") == "inWar":
+                        attack_todo = True
+                    
+                    if war_player.get("opponentAttacks") > 0:
+                        defends += war_player.get("opponentAttacks")
+                        if war_player.get("bestOpponentAttack"):
+                            best_attack = war_player.get("bestOpponentAttack")
+                            defends_stars += best_attack.get("stars")
+                            defends_total_destruction += best_attack.get("destructionPercentage")
+                            defends_total_duration += best_attack.get("duration")
+
+
                     
                     # can also do defend data
             member["cwl_war"] = {
@@ -334,10 +360,50 @@ def get_full_clan_data(tag):
                 "attack_limit": attack_limit,
                 "total_destruction": total_destruction,
                 "total_stars": total_stars,
-                "total_duration": total_duration
+                "total_duration": total_duration,
+                "attack_todo": attack_todo,
+                "defends": defends,
+                "defends_stars": defends_stars,
+                "defends_total_destruction": defends_total_destruction,
+                "defends_total_duration": defends_total_duration
             }
         else:
             member["cwl_war"] = None
+
+
+        # Put CWL round info for this clan (clan, opponent, war tag)
+        if cwl_wars:
+            cwl_war_rounds = []
+            for war in cwl_wars:
+                war_tag = war.get("war_tag")
+                if war.get("opponent").get("tag") == tag:
+                    opponent = war.get("clan").get("name")
+                    opponent_tag = war.get("clan").get("tag")
+                    clan_name = war.get("opponent").get("name")
+                    clan_tag = tag
+                else:
+                    opponent = war.get("opponent").get("name")
+                    opponent_tag = war.get("opponent").get("tag")
+                    clan_name = war.get("clan").get("name")
+                    clan_tag = war.get("clan").get("tag")                    
+
+                # if war.get("clan").get("tag") == tag:
+                #     opponent = war.get("opponent").get("name")
+                #     opponent_tag = war.get("opponent").get("tag")
+
+                # else:
+                #     continue
+                cwl_war_rounds.append({
+                    "war_tag": war_tag,
+                    "clan": clan_name,
+                    "clan_tag": clan_tag,
+                    "opponent": opponent,
+                    "opponent_tag": opponent_tag
+                })
+            clan["cwl_war_rounds"] = cwl_war_rounds
+        else:
+            clan["cwl_war_rounds"] = None
+
                     
             
 
