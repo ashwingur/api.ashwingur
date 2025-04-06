@@ -1,3 +1,4 @@
+import concurrent.futures
 from datetime import datetime, timedelta
 import sys
 from zoneinfo import ZoneInfo
@@ -198,5 +199,155 @@ def gold_pass():
         return jsonify({"success": False, "error": gold_response.json().get("message")}), gold_response.status_code
 
     return jsonify(gold_response.json()), 200
+
+
+@bp.route('/fullclan/<string:tag>', methods=['GET'])
+@limiter.limit('30/minute', override_defaults=True)
+def get_full_clan_data(tag):
+    """
+    Gets all relevant clan data and combines it together in the members
+    Clan data, regular war, cwl war, capital raid
+    """
+    tag = tag.replace("#", "%23")
+    clan_url = f"{BASE_URL}/clans/{tag}"
+    capital_raid = f"{BASE_URL}/clans/{tag}/capitalraidseasons?limit=1"
+    war_url = f"{BASE_URL}/clans/{tag}/currentwar"
+    leaguegroup_url = f"{BASE_URL}/clans/{tag}/currentwar/leaguegroup"
+
+    def fetch(url):
+        return requests.get(url, headers=headers)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(fetch, url) for url in [clan_url, capital_raid, war_url, leaguegroup_url]]
+        clan_response, capital_raid_response, war_response, leaguegroup_response = [f.result() for f in futures]
+    
+
+    if not clan_response.ok:
+        return jsonify({"success": False, "error": clan_response.json().get("message")}), clan_response.status_code
+    if not capital_raid_response.ok:
+        return jsonify({"success": False, "error": clan_response.json().get("message")}), capital_raid_response.status_code
+    if not war_response.ok and war_response.status_code != 403:
+        return jsonify({"success": False, "error": clan_response.json().get("message")}), capital_raid_response.status_code
+    if not leaguegroup_response.ok and leaguegroup_response.status_code != 404:
+        return jsonify({"success": False, "error": clan_response.json().get("message")}), leaguegroup_response.status_code
+    # League group can be 404 if CWL is not currently active
+    # Current war is 403 if war log is not private
+
+    if leaguegroup_response.status_code == 404:
+        leaguegroup_data = None
+    else:
+        leaguegroup_data = leaguegroup_response.json()
+    
+    # If leaguegroup exists then fetch all CWL wars
+    cwl_wars = None
+    if leaguegroup_data:
+        cwl_war_tags = []
+        for r in leaguegroup_data.get("rounds"):
+            for war_tag in r.get("warTags"):
+                if war_tag != "#0":
+                    cwl_war_tags.append(war_tag.replace("#", "%23"))
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(fetch, f"{BASE_URL}/clanwarleagues/wars/{war_tag}") for war_tag in cwl_war_tags]
+            cwl_wars = [f.result().json() for f in futures 
+                                 if f.result() and f.result().ok]
+            print(cwl_wars, file=sys.stderr)
+        
+
+
+    clan = clan_response.json()
+
+    capital_data = capital_raid_response.json()["items"]
+    if len(capital_data) == 1:
+        capital_data = capital_data[0]
+    else:
+        capital_data = None
+
+    war_data = war_response.json() if war_response.status_code != 403 else None
+    
+
+    for member in clan["memberList"]:
+        # Getting raid contributions for current clan capital raid
+        if capital_data and capital_data.get("state") == "ongoing":
+            capital_player = next((p for p in capital_data["members"] if p["tag"] == member["tag"]), None)
+            if capital_player:
+                member["clan_capital"] = {
+                    "attacks": capital_player.get("attacks", 0),
+                    "capitalResourcesLooted": capital_player.get("capitalResourcesLooted", 0)
+                }
+            else:
+                member["clan_capital"] = {
+                    "attacks": 0,
+                    "capitalResourcesLooted": 0
+                }
+        else:
+            member["clan_capital"] = None
+        
+        # Getting current normal war attacks for ongoing war
+        if war_data and war_data.get("state") == "inWar":
+            war_player = next((p for p in war_data["clan"]["members"] if p["tag"] == member["tag"]), None)
+
+            if war_player:
+                member["war"] = {
+                    "attacks": len(war_player.get("attacks"))
+                }
+            else:
+                member["war"] = None
+        else:
+            member["war"] = None
+
+        
+        # Go through each cwl
+        if cwl_wars:
+            attacks = 0
+            attack_limit = 0
+            total_destruction = 0
+            total_stars = 0
+            total_duration = 0
+            for war in cwl_wars:
+                # If it's preparation then skip
+                if war.get("state") == "preparation":
+                    continue
+                # Get the members list if the requested clan is in this war
+                warMembers = None
+                if war.get("clan").get("tag") == tag:
+                    warMembers = war.get("clan").get("members")
+                elif war.get("opponent").get("tag") == tag:
+                    warMembers = war.get("opponent").get("members")
+                else:
+                    continue
+
+                war_player = next((p for p in warMembers if p["tag"] == member["tag"]), None)
+
+                # War state can be inWar or warEnded
+                if war_player:
+                    attack_limit += 1
+                    if len(war_player.get("attacks")) == 1:
+                        attack_info = war_player.get("attacks")[0]
+                        attacks += 1
+                        total_destruction += attack_info.get("destructionPercentage")
+                        total_stars += attack_info.get("stars")
+                        total_duration += attack_info.get("duration")
+                    
+                    # can also do defend data
+            member["cwl_war"] = {
+                "attacks": attacks,
+                "attack_limit": attack_limit,
+                "total_destruction": total_destruction,
+                "total_stars": total_stars,
+                "total_duration": total_duration
+            }
+        else:
+            member["cwl_war"] = None
+                    
+            
+
+
+
+    
+
+
+
+
+    return jsonify(clan), 200
 
 
