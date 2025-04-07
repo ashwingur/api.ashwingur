@@ -377,23 +377,43 @@ def get_full_clan_data(tag):
             for war in cwl_wars:
                 war_tag = war.get("war_tag").replace("%23","#")
                 if war.get("opponent").get("tag") == tag:
+                    # Make our clan the friendly one
                     opponent = war.get("clan").get("name")
                     opponent_tag = war.get("clan").get("tag")
+                    opponent_attacks = war.get("clan").get("attacks")
+                    opponent_stars = war.get("clan").get("stars")
+                    opponent_destruction_percentage = war.get("clan").get("destructionPercentage")
                     clan_name = war.get("opponent").get("name")
                     clan_tag = tag
+                    clan_attacks = war.get("opponent").get("attacks")
+                    clan_stars = war.get("opponent").get("stars")
+                    clan_destruction_percentage = war.get("opponent").get("destructionPercentage")
                 else:
                     opponent = war.get("opponent").get("name")
                     opponent_tag = war.get("opponent").get("tag")
+                    opponent_attacks = war.get("opponent").get("attacks")
+                    opponent_stars = war.get("opponent").get("stars")
+                    opponent_destruction_percentage = war.get("opponent").get("destructionPercentage")
                     clan_name = war.get("clan").get("name")
-                    clan_tag = war.get("clan").get("tag")                    
+                    clan_tag = war.get("clan").get("tag")  
+                    clan_attacks = war.get("clan").get("attacks")
+                    clan_stars = war.get("clan").get("stars")
+                    clan_destruction_percentage = war.get("clan").get("destructionPercentage")                                      
 
                 cwl_war_rounds.append({
                     "war_tag": war_tag,
                     "clan": clan_name,
                     "clan_tag": clan_tag,
+                    "clan_attacks": clan_attacks,
+                    "clan_stars": clan_stars,
+                    "clan_destruction_percentage": clan_destruction_percentage,
                     "opponent": opponent,
                     "opponent_tag": opponent_tag,
-                    "state": war.get("state")
+                    "opponent_attacks": opponent_attacks,
+                    "opponent_stars": opponent_stars,
+                    "opponent_destruction_percentage": opponent_destruction_percentage,
+                    "state": war.get("state"),
+                    "team_size": war.get("teamSize"),
                 })
             clan["cwl_war_rounds"] = cwl_war_rounds
         else:
