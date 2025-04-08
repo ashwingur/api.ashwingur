@@ -271,6 +271,10 @@ def get_full_clan_data(tag):
         capital_data = None
 
     war_data = war_response.json() if war_response.status_code != 403 else None
+
+    clan["war"] = war_data
+    clan["cwl_wars"] = cwl_wars
+    clan["capital_raid_data"] = capital_data
     
 
     for member in clan["memberList"]:
