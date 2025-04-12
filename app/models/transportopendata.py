@@ -74,7 +74,7 @@ def query_parking_data(facility_id: int, start_time: datetime, end_time: datetim
             time_bucket = '1 hour'
         elif days <= 32:
             time_bucket = '2 hours'
-        elif days <= 90:
+        elif days <= 365:
             time_bucket = '1 day'
         else:
             time_bucket = '7 days'
