@@ -300,7 +300,7 @@ def get_full_clan_data(tag):
 
             if war_player:
                 member["war"] = {
-                    "attacks": len(war_player.get("attacks"))
+                    "attacks": len(war_player.get("attacks", []))
                 }
             else:
                 member["war"] = None
