@@ -231,10 +231,12 @@ def get_player_data(tag):
             CocPlayerData.timestamp <= end_date.astimezone(ZoneInfo("UTC"))
         )
     ).order_by(CocPlayerData.timestamp.asc()).all()
-
+    print(player.activity_change_date, file=sys.stderr)
     # Serialize results
-    schema = CocPlayerDataSchema(many=True)
-    return jsonify({"name": player.name, "view_count": player.view_count, "clan_tag": player.clan_tag, "clan_name": player.clan_name, "tag": player.tag,"history": schema.dump(player_data)}), 200
+    data_schema = CocPlayerDataSchema(many=True)
+    player_schema = CocPlayerSchema()
+
+    return jsonify({**player_schema.dump(player), "history": data_schema.dump(player_data)}), 200
 
 @bp.route('/player_data/increment_view_count/<string:tag>', methods=['PATCH'])
 @limiter.limit('1/5minute;20/day', key_func=lambda: f"{get_real_ip()}:{request.view_args.get('tag', 'UNKNOWN')}", override_defaults=True)
