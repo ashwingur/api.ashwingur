@@ -54,6 +54,9 @@ class CocPlayer(db.Model):
     clan_tag = db.Column(db.String(15), nullable=True)
     clan_name = db.Column(db.String(20), nullable=True)
     view_count = db.Column(db.Integer, nullable=False, default=0)
+    last_activity_state = db.Column(JSONB, nullable=True)
+    last_state_date = db.Column(db.DateTime(timezone=True), nullable=True)
+    activity_change_date = db.Column(db.DateTime(timezone=True), nullable=True)
 
 
 class PlayerDataItemLevelSchema(Schema):
@@ -98,3 +101,4 @@ class CocPlayerSchema(SQLAlchemyAutoSchema):
     class Meta:
         model = CocPlayer
         load_instance = True
+        exclude = ("last_activity_state", "last_state_date")

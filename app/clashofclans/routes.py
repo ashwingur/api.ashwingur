@@ -111,6 +111,83 @@ def set_player_data():
 
     return jsonify({"success": True}), 201
 
+@bp.route('update_player_activity', methods=['POST'])
+@limiter.limit('1/15seconds;4/minute', override_defaults=True)
+def update_player_activity():
+    all_players = CocPlayer.query.all()
+    # Get the current Flask app context
+    app = current_app._get_current_object()  # Extract actual app instance
+
+    def process_player(tag, app):
+        with app.app_context():  # Ensure Flask context is available
+            
+            # Create a new database session for this thread
+            session = db.sessionmaker(bind=db.engine)()
+
+            try:
+
+                url = f"{BASE_URL}/players/{tag.replace('#', '%23')}"
+                player_response = requests.get(url, headers=headers)
+
+                if player_response.status_code != 200:
+                    return None
+                
+                player = session.query(CocPlayer).get(tag)
+                if player_response.json().get("clan"):
+                    player.clan_tag = player_response.json()["clan"]["tag"]
+                    player.clan_name = player_response.json()["clan"]["name"]
+                    
+
+                data = player_response.json()
+                
+                # Build the new activity state
+                new_activity_state = {
+                    "name": data.get("name"),
+                    "builderBaseTrophies": data.get("builderBaseTrophies"),
+                    "warPreference": data.get("warPreference"),
+                    "clanCapitalContributions": data.get("clanCapitalContributions")
+                }
+
+                # Also do specific achievement changes that can indicate activity
+                achievements = ["Nice and Tidy", "Gold Grab", "Elixir Escapade", 
+                                "Heroic Heist", "Conqueror", "Friend in Need", 
+                                "War Hero", "Clan War Wealth", "Games Champion",
+                                "War League Legend", "Well Seasoned" ]
+                
+                for a in achievements:
+                    value = next((x.get("value") for x in data.get("achievements") if x["name"] == a), None)
+                    new_activity_state[a] = value
+                
+                if new_activity_state != player.last_activity_state:
+                    # Player made an action between the 2 states
+                    player.activity_change_date = player.last_state_date
+                    player.last_activity_state = new_activity_state
+                
+                player.last_state_date = datetime.now(ZoneInfo("UTC"))
+                
+                session.commit()
+                return tag  # Return tag after processing
+            except Exception as e:
+                session.rollback()
+                print(f"Error processing {tag}: {str(e)}", file=sys.stderr)
+                return None
+            finally:
+                session.close()  # Ensure the session is closed properly
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        # Submit tasks for each player in parallel, passing the app instance
+        futures = [executor.submit(process_player, p.tag, app) for p in all_players]
+
+        # Wait for all futures to complete and handle the results
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result is None:
+                print(f"Failed to commit data for a player.", file=sys.stderr)
+            else:
+                print(f"Successfully committed data for {result}", file=sys.stderr)
+
+    return jsonify({"success": True}), 201
+
 
 @bp.route('/player_data/<string:tag>', methods=['GET'])
 @limiter.limit('30/minute', override_defaults=True)
