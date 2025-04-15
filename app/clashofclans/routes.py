@@ -97,7 +97,7 @@ def set_player_data():
             finally:
                 session.close()  # Ensure the session is closed properly
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         # Submit tasks for each player in parallel, passing the app instance
         futures = [executor.submit(process_player, p.tag, app) for p in all_players]
 
@@ -136,6 +136,7 @@ def update_player_activity():
                 if player_response.json().get("clan"):
                     player.clan_tag = player_response.json()["clan"]["tag"]
                     player.clan_name = player_response.json()["clan"]["name"]
+                    player.name = player_response.json()["name"]
                     
 
                 data = player_response.json()
@@ -184,7 +185,8 @@ def update_player_activity():
             if result is None:
                 print(f"Failed to commit data for a player.", file=sys.stderr)
             else:
-                print(f"Successfully committed data for {result}", file=sys.stderr)
+                pass
+                # print(f"Successfully committed data for {result}", file=sys.stderr)
 
     return jsonify({"success": True}), 201
 
