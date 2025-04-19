@@ -368,10 +368,7 @@ def get_full_clan_data(tag):
                     "capitalResourcesLooted": capital_player.get("capitalResourcesLooted", 0)
                 }
             else:
-                member["clan_capital"] = {
-                    "attacks": 0,
-                    "capitalResourcesLooted": 0
-                }
+                member["clan_capital"] = None # We dont want players who haven't opened it to show up
         else:
             member["clan_capital"] = None
         
