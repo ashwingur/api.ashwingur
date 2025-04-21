@@ -80,6 +80,9 @@ def set_player_data():
                 if player_response.json().get("clan"):
                     player.clan_tag = player_response.json()["clan"]["tag"]
                     player.clan_name = player_response.json()["clan"]["name"]
+                else:
+                    player.clan_tag = None
+                    player.clan_name = None
                     
 
                 data = player_response.json()
@@ -136,7 +139,10 @@ def update_player_activity():
                 if player_response.json().get("clan"):
                     player.clan_tag = player_response.json()["clan"]["tag"]
                     player.clan_name = player_response.json()["clan"]["name"]
-                    player.name = player_response.json()["name"]
+                else:
+                    player.clan_tag = None
+                    player.clan_name = None
+                player.name = player_response.json()["name"]
                     
 
                 data = player_response.json()
