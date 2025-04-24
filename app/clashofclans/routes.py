@@ -510,3 +510,28 @@ def get_full_clan_data(tag):
     return jsonify(clan), 200
 
 
+@bp.route('/clan/<string:tag>/capitalraidseasons', methods=['GET'])
+@limiter.limit('4/second', override_defaults=True)
+def get_capital_raid_seasons(tag):
+    tag = tag.replace("#", "%23")
+    try:
+        limit = int(request.args.get('limit', default=10))
+        if limit < 1 or limit > 20:
+            raise ValueError
+    except ValueError:
+        return jsonify({"success": False, "error": f"limit must be an integer between 1-20, but received '{limit}'"}), 400
+    after = request.args.get('after')
+
+    params = {
+        "limit": limit
+    }
+    if after:
+        params["after"] = after
+
+    capital_raid_response = requests.get(f"{BASE_URL}/clans/{tag}/capitalraidseasons", params=params, headers=headers)
+
+    if capital_raid_response.status_code != 200:
+        return jsonify({"success": False, "error": capital_raid_response.json().get("message")}), capital_raid_response.status_code
+
+    return jsonify(capital_raid_response.json()), 200
+
