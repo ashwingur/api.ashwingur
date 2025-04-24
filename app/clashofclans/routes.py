@@ -531,7 +531,7 @@ def get_capital_raid_seasons(tag):
     capital_raid_response = requests.get(f"{BASE_URL}/clans/{tag}/capitalraidseasons", params=params, headers=headers)
 
     if capital_raid_response.status_code != 200:
-        return jsonify({"success": False, "error": capital_raid_response.json().get("message")}), capital_raid_response.status_code
+        return jsonify({"success": False, "error": capital_raid_response.json().get("reason")}), capital_raid_response.status_code
 
     return jsonify(capital_raid_response.json()), 200
 
