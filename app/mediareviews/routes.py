@@ -405,6 +405,10 @@ def delete_submediareview(id):
         return jsonify({"error": "SubMediaReview not found"}), 404
 
     try:
+        try:
+            ImageProxy.delete_image(SubMediaReview.encode_image_name(sub_media_review.id))
+        except Exception as e:
+            print(f"Unable to delete image for '{SubMediaReview.encode_image_name(sub_media_review.id)}': {e}", file=sys.stderr)
         db.session.delete(sub_media_review)
         db.session.commit()
         return '', 204
@@ -428,7 +432,18 @@ def download_all_images():
                 print(f'Downloaded cover image for {review.name}', file=sys.stderr)
             except Exception as e:
                 print(f"Unable to download cover image for '{ MediaReview.encode_image_name(review.name)}': {e}", file=sys.stderr)
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=20) as executor:
         executor.map(partial(download, app=app), media_reviews)
+
+    sub_media_reviews: List[SubMediaReview] = SubMediaReview.query.all()
+    def download(review: SubMediaReview, app):
+        with app.app_context():
+            try:
+                ImageProxy.download_image(review.cover_image, SubMediaReview.encode_image_name(review.id))
+                print(f'Downloaded cover image for {review.name}', file=sys.stderr)
+            except Exception as e:
+                print(f"Unable to download cover image for '{ MediaReview.encode_image_name(review.name)}': {e}", file=sys.stderr)
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        executor.map(partial(download, app=app), sub_media_reviews)
 
     return jsonify({"success": True}), 200

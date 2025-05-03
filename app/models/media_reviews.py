@@ -102,10 +102,10 @@ class MediaReview(db.Model):
             db.session.commit()
 
             try:
-                cover_image_name = f"{self.name}_review_cover"
+                cover_image_name = MediaReview.encode_image_name(self.name)
                 ImageProxy.download_image(self.cover_image, cover_image_name)
             except Exception as e:
-                print(f"Unable to download cover image for '{self.cover_image}': {e}", file=sys.stderr)
+                print(f"Unable to download cover image for '{self.name}': {e}", file=sys.stderr)
 
             result = media_review_schema.dump(self)
             return jsonify(result), 201
@@ -159,25 +159,31 @@ class SubMediaReview(db.Model):
         'MediaReview', back_populates='sub_media_reviews')
 
     def insert(self):
-        # Extract name and media_review_id for checking existence
-        name = self.name
-        media_review_id = self.media_review_id
-
-        # Check if the MediaReview exists
-        media_review = MediaReview.query.get(media_review_id)
-        if not media_review:
-            return jsonify({"error": "MediaReview with this ID does not exist"}), 404
-
-        # Check if the SubMediaReview already exists with the same name for the given media_review
-        existing_review = SubMediaReview.query.filter_by(
-            name=name, media_review_id=media_review_id).first()
-        if existing_review:
-            return jsonify({"error": f"SubMediaReview with the name '{name}' already exists for the given media review"}), 409
-
-        db.session.add(self)
-        db.session.commit()
-
         try:
+            # Extract name and media_review_id for checking existence
+            name = self.name
+            media_review_id = self.media_review_id
+
+            # Check if the MediaReview exists
+            media_review = MediaReview.query.get(media_review_id)
+            if not media_review:
+                return jsonify({"error": "MediaReview with this ID does not exist"}), 404
+
+            # Check if the SubMediaReview already exists with the same name for the given media_review
+            existing_review = SubMediaReview.query.filter_by(
+                name=name, media_review_id=media_review_id).first()
+            if existing_review:
+                return jsonify({"error": f"SubMediaReview with the name '{name}' already exists for the given media review"}), 409
+
+            db.session.add(self)
+            db.session.commit()
+            try:
+                if self.cover_image:
+                    cover_image_name = SubMediaReview.encode_image_name(self.id)
+                ImageProxy.download_image(self.cover_image, cover_image_name)
+            except Exception as e:
+                print(f"Unable to download cover image for '{self.name}': {e}", file=sys.stderr)
+
             # Serialize the new SubMediaReview instance
             result = sub_media_review_schema.dump(self)
             return jsonify(result), 201
@@ -194,12 +200,23 @@ class SubMediaReview(db.Model):
             return jsonify({"error": f"SubMediaReview with the name '{existing_review.name}' already exists for the given media review"}), 409
 
         try:
+            if self.cover_image:
+                cover_image_name = SubMediaReview.encode_image_name(self.id)
+                ImageProxy.download_image(self.cover_image, cover_image_name)
+        except Exception as e:
+            print(f"Unable to update cover image for '{self.name}': {e}", file=sys.stderr)
+
+        try:
             db.session.commit()
             result = sub_media_review_schema.dump(self)
             return jsonify(result), 200
         except IntegrityError:
             db.session.rollback()
             return jsonify({"error": "An error occurred while updating the media review"}), 500
+        
+    @staticmethod
+    def encode_image_name(subreview_id: int):
+        return f"subreview_{subreview_id}_review_cover"
 
 
 class GenreSchema(SQLAlchemyAutoSchema):
@@ -238,13 +255,20 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
     pros = fields.List(fields.Str(), required=True)
     cons = fields.List(fields.Str(), required=True)
     visible = fields.Bool(required=True)
-
     signed_cover_image = fields.Method(
         "get_signed_cover_image", dump_only=True)
+    local_signed_cover_image = fields.Method(
+        "get_local_signed_cover_image", dump_only=True)
 
     def get_signed_cover_image(self, obj):
         if obj.cover_image:
             return ImageProxy.sign_image_url(obj.cover_image, format='avif', h=320, enlarge=True, quality=60)
+        return None
+    
+    def get_local_signed_cover_image(self, obj):
+        if obj.cover_image:
+            return ImageProxy.sign_image_url(f"local:///{SubMediaReview.encode_image_name(obj.id)}", format='avif', 
+                                             h=320, enlarge=True, quality=60, cachebuster=obj.review_last_update_date)
         return None
 
     @validates("cover_image_bg_colour")
