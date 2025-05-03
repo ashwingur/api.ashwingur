@@ -1,11 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from functools import partial
 import sys
 from typing import List
 from flask_login import login_required
 from marshmallow import ValidationError
 from sqlalchemy import func, or_, select
+from app.image_proxy import ImageProxy
 from app.mediareviews import bp
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
 from app.extensions import db, roles_required, limiter
 from dateutil import parser
@@ -243,6 +246,15 @@ def update_review(review_id):
     existing_review = MediaReview.query.get(review_id)
     if not existing_review:
         return jsonify({"error": "MediaReview not found"}), 404
+    
+    # Check if the name changed or cover image changed
+    name_changed = False
+    if json_data.get('name') != existing_review.name:
+        name_changed = True
+        old_name = existing_review.name
+    cover_image_changed = False
+    if json_data.get('cover_image') != existing_review.cover_image:
+        cover_image_changed = True
 
     # Temporarily remove genres from json_data to avoid premature processing
     genres_data = json_data.pop('genres', [])
@@ -284,6 +296,14 @@ def update_review(review_id):
     for genre in all_genres:
         if not genre.media_reviews:
             db.session.delete(genre)
+    try:
+        if name_changed and not cover_image_changed:
+            ImageProxy.rename_image( MediaReview.encode_image_name(old_name),  MediaReview.encode_image_name(media_review.name))
+        elif cover_image_changed and media_review.cover_image:
+            ImageProxy.download_image(media_review.cover_image, MediaReview.encode_image_name(media_review.name))
+    except Exception as e:
+        print(f"Unable to download or update cover image for '{MediaReview.encode_image_name(media_review.name)}': {e}", file=sys.stderr)
+        
 
     # Commit changes
     try:
@@ -308,6 +328,10 @@ def delete_review(review_id):
         return jsonify({"error": "MediaReview not found"}), 404
 
     try:
+        try:
+            ImageProxy.delete_image(MediaReview.encode_image_name(media_review.name))
+        except Exception as e:
+            print(f"Unable to delete image for '{MediaReview.encode_image_name(media_review.name)}': {e}", file=sys.stderr)
         db.session.delete(media_review)
 
         # Delete orphaned genres
@@ -387,3 +411,24 @@ def delete_submediareview(id):
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "An error occurred while deleting the sub media review"}), 500
+    
+
+@bp.route('/download-all-images', methods=['POST'])
+@login_required
+@roles_required('admin')
+def download_all_images():
+    media_reviews: List[MediaReview] = MediaReview.query.all()
+
+    app = current_app._get_current_object()
+
+    def download(review: MediaReview, app):
+        with app.app_context():
+            try:
+                ImageProxy.download_image(review.cover_image, MediaReview.encode_image_name(review.name))
+                print(f'Downloaded cover image for {review.name}', file=sys.stderr)
+            except Exception as e:
+                print(f"Unable to download cover image for '{ MediaReview.encode_image_name(review.name)}': {e}", file=sys.stderr)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(partial(download, app=app), media_reviews)
+
+    return jsonify({"success": True}), 200

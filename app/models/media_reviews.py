@@ -112,6 +112,10 @@ class MediaReview(db.Model):
         except IntegrityError:
             db.session.rollback()
             return jsonify({"error": "An error occurred while creating the media review"}), 500
+    
+    @staticmethod
+    def encode_image_name(review_name):
+        return ImageProxy.sanitise_name(review_name) + "_review_cover"
 
 
 class Genre(db.Model):
@@ -295,7 +299,8 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
     
     def get_local_signed_cover_image(self, obj):
         if obj.cover_image:
-            return ImageProxy.sign_image_url(f"local:///{obj.name}_review_cover", format='avif', h=320, enlarge=True, quality=60)
+            return ImageProxy.sign_image_url(f"local:///{MediaReview.encode_image_name(obj.name)}", format='avif', 
+                                             h=320, enlarge=True, quality=60, cachebuster=obj.review_last_update_date)
         return None
 
     @validates("cover_image_bg_colour")

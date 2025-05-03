@@ -2,7 +2,9 @@ import base64
 import hashlib
 import hmac
 import os
+import re
 from typing import Literal
+import unicodedata
 from urllib.parse import quote_plus
 import requests
 from werkzeug.utils import secure_filename
@@ -19,7 +21,7 @@ class ImageProxy:
     def sign_image_url(url: str, format: Literal['webp', 'avif', 'png', 'jpg'] | None,
                        resizing_type: Literal['fit', 'fill',
                                               'fill-down', 'force', 'auto'] = 'fit',
-                       w=0, h=0, enlarge: bool = False, quality=75) -> str:
+                       w=0, h=0, enlarge: bool = False, quality=75, cachebuster: str = None) -> str:
         # Escape special characters in url
         if url.startswith("local:///"):
             # Only quote the path part, not the protocol
@@ -29,6 +31,9 @@ class ImageProxy:
 
         # Only process to webp if it isn't already and handle animated GIFs
         imgproxy_url = f'/rs:{resizing_type}:{w}:{h}:{1 if enlarge else 0}/q:{quality}'
+        
+        if cachebuster is not None:
+            imgproxy_url += f'/cb:{quote_plus(str(cachebuster))}'
 
         if format:
             imgproxy_url = f'{imgproxy_url}/plain/{url}@{format}'
@@ -93,3 +98,54 @@ class ImageProxy:
 
         # Return the path where the image is saved
         return os.path.relpath(save_path, current_app.root_path)
+
+    @staticmethod
+    def rename_image(old_filename: str, new_filename: str) -> str:
+        """
+        Renames an existing image file in the 'static/images' directory.
+
+        :param old_filename: The current name of the image file.
+        :param new_filename: The new name to give the image file.
+        :return: The new relative path of the renamed image.
+        :raises FileNotFoundError: If the old image file does not exist.
+        """
+        image_dir = os.path.join(current_app.root_path, 'static', 'images')
+
+        old_path = os.path.join(image_dir, secure_filename(old_filename))
+        new_path = os.path.join(image_dir, secure_filename(new_filename))
+
+        if not os.path.isfile(old_path):
+            raise FileNotFoundError(f"Image '{old_filename}' not found.")
+
+        os.rename(old_path, new_path)
+
+        return os.path.relpath(new_path, current_app.root_path)
+
+    @staticmethod
+    def delete_image(filename: str) -> None:
+        """
+        Deletes an image from the 'static/images' directory.
+
+        :param filename: The name of the image file to delete.
+        :raises FileNotFoundError: If the image file does not exist.
+        """
+        image_dir = os.path.join(current_app.root_path, 'static', 'images')
+        file_path = os.path.join(image_dir, secure_filename(filename))
+
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"Image '{filename}' not found.")
+
+        os.remove(file_path)
+
+    @staticmethod
+    def sanitise_name(name: str) -> str:
+        # Normalize Unicode characters to their closest ASCII equivalent
+        name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('ascii')
+
+        # Replace spaces and similar characters with underscore
+        name = re.sub(r'[\s]+', '_', name)
+
+        # Remove all characters except alphanumeric, underscore, and dash
+        name = re.sub(r'[^\w\-]', '', name)
+
+        return name
