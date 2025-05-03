@@ -1,8 +1,12 @@
 import base64
 import hashlib
 import hmac
+import os
 from typing import Literal
 from urllib.parse import quote_plus
+import requests
+from werkzeug.utils import secure_filename
+from flask import current_app
 
 from config import Config
 
@@ -17,7 +21,11 @@ class ImageProxy:
                                               'fill-down', 'force', 'auto'] = 'fit',
                        w=0, h=0, enlarge: bool = False, quality=75) -> str:
         # Escape special characters in url
-        url = quote_plus(url)
+        if url.startswith("local:///"):
+            # Only quote the path part, not the protocol
+            url = "local:///" + quote_plus(url[9:])
+        else:
+            url = quote_plus(url)
 
         # Only process to webp if it isn't already and handle animated GIFs
         imgproxy_url = f'/rs:{resizing_type}:{w}:{h}:{1 if enlarge else 0}/q:{quality}'
@@ -44,3 +52,44 @@ class ImageProxy:
             base_url = "https://imgproxy.ashwingur.com"
 
         return base_url + url.decode()
+    
+    @staticmethod
+    def download_image(url: str, filename: str) -> str:
+        """
+        Downloads an image from an external URL and saves it to the 'static/images' directory with the given filename.
+        
+        :param url: The URL of the image to download.
+        :param filename: The name to save the image as (without path).
+        :return: The full path to the saved image.
+        """
+        # Define the directory where images will be saved
+        image_dir = os.path.join(current_app.root_path, 'static', 'images')
+
+        # Ensure the directory exists
+        os.makedirs(image_dir, exist_ok=True)
+
+        # Add User-Agent header to mimic a browser
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                        'AppleWebKit/537.36 (KHTML, like Gecko) '
+                        'Chrome/113.0.0.0 Safari/537.36'
+        }
+        # Get the image content from the URL
+        response = requests.get(url, stream=True, headers=headers)
+
+        # Check if the request was successful
+        if response.status_code != 200:
+            raise Exception(f"Failed to download image. Status code: {response.status_code}")
+
+        # Sanitize the filename to prevent any issues
+        filename = secure_filename(filename)
+
+        # Define the path where the image will be saved
+        save_path = os.path.join(image_dir, filename)
+
+        # Save the image to the file
+        with open(save_path, 'wb') as file:
+            file.write(response.content)
+
+        # Return the path where the image is saved
+        return os.path.relpath(save_path, current_app.root_path)

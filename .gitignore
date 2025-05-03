@@ -1,6 +1,10 @@
 *.backup
 docker-compose.override.yml
 
+# Ignore every shared image except test.jpg
+/shared_images/*
+!/shared_images/test.jpg
+
 # Ignore everything in the migrations folder
 migrations/
 

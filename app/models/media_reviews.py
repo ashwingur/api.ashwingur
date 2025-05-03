@@ -100,6 +100,13 @@ class MediaReview(db.Model):
 
             db.session.add(self)
             db.session.commit()
+
+            try:
+                cover_image_name = f"{self.name}_review_cover"
+                ImageProxy.download_image(self.cover_image, cover_image_name)
+            except Exception as e:
+                print(f"Unable to download cover image for '{self.cover_image}': {e}", file=sys.stderr)
+
             result = media_review_schema.dump(self)
             return jsonify(result), 201
         except IntegrityError:
@@ -278,10 +285,17 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         SubMediaReviewSchema), dump_only=True)
     signed_cover_image = fields.Method(
         "get_signed_cover_image", dump_only=True)
+    local_signed_cover_image = fields.Method(
+        "get_local_signed_cover_image", dump_only=True)
 
     def get_signed_cover_image(self, obj):
         if obj.cover_image:
             return ImageProxy.sign_image_url(obj.cover_image, format='avif', h=320, enlarge=True, quality=60)
+        return None
+    
+    def get_local_signed_cover_image(self, obj):
+        if obj.cover_image:
+            return ImageProxy.sign_image_url(f"local:///{obj.name}_review_cover", format='avif', h=320, enlarge=True, quality=60)
         return None
 
     @validates("cover_image_bg_colour")

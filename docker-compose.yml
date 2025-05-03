@@ -38,6 +38,8 @@ services:
       - flask_redis
     networks:
       - app_network
+    volumes:
+      - ./shared_images:/app/app/static/images
 
   flask_db:
     container_name: flask_db
@@ -68,8 +70,11 @@ services:
       - IMGPROXY_KEY=${IMGPROXY_KEY}
       - IMGPROXY_SALT=${IMGPROXY_SALT}
       - IMGPROXY_MAX_ANIMATION_FRAMES=30
+      - IMGPROXY_LOCAL_FILESYSTEM_ROOT=/images
     networks:
       - app_network
+    volumes:
+      - ./shared_images:/images
 
 volumes:
   pgdata: {}

@@ -11,6 +11,8 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
+RUN mkdir -p /app/static/images
+
 EXPOSE 5000
 
 ENV FLASK_ENV=development

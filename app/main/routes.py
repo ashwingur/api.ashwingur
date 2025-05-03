@@ -23,8 +23,19 @@ def index():
 
 @bp.route('/imagetest')
 def image_test():
-    return ImageProxy.sign_image_url("https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg", format='avif')
+    # return ImageProxy.sign_image_url("https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg", format='avif')
+    return ImageProxy.sign_image_url("local:///downloaded_image.jpg", format='avif')
 
+@bp.route("/downloadimage")
+def download_and_save_image_test():
+    image_url = 'https://static.vecteezy.com/system/resources/thumbnails/036/324/708/small/ai-generated-picture-of-a-tiger-walking-in-the-forest-photo.jpg'
+    filename = 'downloaded_image.jpg'
+    
+    try:
+        saved_image_path = ImageProxy.download_image(image_url, filename)
+        return jsonify({"message": f"Image saved at {saved_image_path}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @bp.route('/ip')
 def ip():
