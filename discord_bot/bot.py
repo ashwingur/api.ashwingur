@@ -16,6 +16,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     await bot.load_extension("clash_commands")
+    await bot.load_extension("transportopendata_commands")
+    
     try:
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} global slash command(s)")

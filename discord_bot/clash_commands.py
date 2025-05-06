@@ -1,5 +1,3 @@
-# clash_commands.py
-
 import sys
 import discord
 from discord import app_commands
