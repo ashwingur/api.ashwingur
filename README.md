@@ -39,20 +39,24 @@ docker compose up --build flask_app
 This is required and should be manually created in the root folder
 
 ```
-POSTGRES_USER=XXX
-POSTGRES_PASSWORD=XXX
-POSTGRES_DB=XXX
-FLASK_SECRET_KEY=XXX
-WEATHER_POST_PASSWORD=XXX
-PARKING_POST_PASSWORD=XXX
-OPEN_DATA_TOKEN=XXX.XXX
-FLASK_ENV=DEV|PROD
+# Postgres credentials
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_DB=
 
-IMGPROXY_KEY=XXX
-IMGPROXY_SALT=XXX
+# Other tokens used by Flask
+FLASK_ENV=DEV|PROD
+FLASK_SECRET_KEY=
+WEATHER_POST_PASSWORD=
+PARKING_POST_PASSWORD=
+OPEN_DATA_TOKEN=
+
+IMGPROXY_KEY=
+IMGPROXY_SALT=
 
 # For flask migrate
 FLASK_APP="app:create_app"
-DB_URL=postgresql://user:password@localhost:5432/db_name
 REDIS_URL=redis://localhost:6379/0
+
+DISCORD_BOT_TOKEN=
 ```
