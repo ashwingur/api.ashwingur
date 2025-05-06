@@ -43,7 +43,10 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
     title=f"War Info: {data.get('name', 'Unknown')}",
     description=f"Tag: {data.get('tag')}",
     color=discord.Color.green()
-                    )
+    )
+
+    embed.set_thumbnail(url=data.get("badgeUrls").get("small"))
+
     if clan_war:
         clan1 = clan_war["clan"]
         clan2 = clan_war["opponent"]
