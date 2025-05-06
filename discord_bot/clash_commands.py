@@ -77,7 +77,7 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
             if attacks_todo:
                 embed.add_field(name="Attacks Pending", value=", ".join(attacks_todo), inline=False)
             else:
-                embed.add_field(name="Attacks Pending", value="All players have attacked!", inline=False)
+                embed.add_field(name="Attacks Pending", value="All players have attacked! <a:knightcheer:1369254948717723719>", inline=False)
     else:
         embed.add_field(name="Status", value="Clan war log is private, or the clan is not in a war")
     
