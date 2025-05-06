@@ -12,10 +12,8 @@ class TransportOpenDataCommands(commands.Cog):
 
     @app_commands.command(name="parking", description="NSW live carpark data")
     @app_commands.describe(name="Parking name (optional)")
-    async def war(self, interaction: discord.Interaction, name: str = None):
+    async def parking(self, interaction: discord.Interaction, name: str = None):
         await interaction.response.defer()
-
-
         url = f"{BASE_URL}/transportopendata"
 
         try:

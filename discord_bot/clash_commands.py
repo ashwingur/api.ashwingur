@@ -206,6 +206,78 @@ class ClashCommands(commands.Cog):
         except Exception as e:
             await channel.send(f"Error: {e}")
 
+    @app_commands.command(name="activity", description="Check when TheOrganisation members were last active")
+    @app_commands.describe(days="Days ago to filter by (default = 7)", name="Player name, overrides days filter (optional)")
+    async def activity(self, interaction: discord.Interaction, days: int = 7, name: str = None):
+        """
+        Send player history, applying any relevant name and day filters.
+        """
+        await interaction.response.defer()
+        url = f"{BASE_URL}/clashofclans/players"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        await interaction.followup.send("Unable to fetch activity data")
+                        return
+                    
+                    data = await resp.json()
+                    data.sort(key=lambda x: -x["view_count"])
+                    current_time = datetime.now(timezone.utc)
+                    seconds = days * 24 * 60 * 60 
+
+                    if name:
+                        name = name.lower()
+                        filtered = [
+                            item for item in data
+                            if name in item.get("name", "").lower() and item.get("clan_tag") == DEFAULT_CLAN_TAG
+                            and item.get("activity_change_date")
+                        ]
+                    else:
+                        filtered = [
+                            item for item in data
+                            if item.get("clan_tag") == DEFAULT_CLAN_TAG and item.get("activity_change_date")
+                            and (current_time - datetime.fromisoformat(item["activity_change_date"])).total_seconds() <= seconds
+                        ]
+                    
+                    if not filtered:
+                        embed = discord.Embed(
+                            title=f'Player Activity',
+                            color=discord.Color.dark_grey(),
+                            description=f"No players matching search"
+                        )
+                        embed.timestamp = datetime.now(timezone.utc)
+                        await interaction.followup.send(embed=embed)
+                        return
+
+                    chunked = [filtered[i:i+25] for i in range(0, len(filtered), 25)]
+
+                    for i, chunk in enumerate(chunked):
+                        embed = discord.Embed(
+                            title=f'Player Activity{" (cont.)" if i > 0 else ""}',
+                            color=discord.Color.green(),
+                            description="*Mostly accurate* :chart_with_upwards_trend: "
+                        )
+                        embed.timestamp = datetime.now(timezone.utc)
+                        for item in chunk:
+
+                            activity_date = datetime.fromisoformat(item["activity_change_date"])
+                            time_difference = (current_time - activity_date).total_seconds()
+
+                            time_string = format_seconds_to_time_string(time_difference)
+
+                            embed.add_field(
+                                name=f'{item["name"]}',
+                                value=f"{time_string}",
+                                inline=True
+                            )
+
+                        await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            await interaction.followup.send(f"Error: {e}")
+
     @send_daily_war_status.before_loop
     async def before_send(self):
         await self.bot.wait_until_ready()
