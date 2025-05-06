@@ -257,7 +257,7 @@ class ClashCommands(commands.Cog):
                         embed = discord.Embed(
                             title=f'Player Activity{" (cont.)" if i > 0 else ""}',
                             color=discord.Color.green(),
-                            description="*Mostly accurate* :chart_with_upwards_trend: "
+                            description=f"*Mostly accurate* :chart_with_upwards_trend: " + (f'(last {days} days)' if not name else '')
                         )
                         embed.timestamp = datetime.now(timezone.utc)
                         for item in chunk:
