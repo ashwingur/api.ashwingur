@@ -32,6 +32,16 @@ class TransportOpenDataCommands(commands.Cog):
                         filtered = [item for item in data if name in item.get("name", "").lower()]
                     else:
                         filtered = data
+                    
+                    if not filtered:
+                        embed = discord.Embed(
+                            title=f'Live Parking Data',
+                            color=discord.Color.dark_grey(),
+                            description=f"No data matching search '{name}'"
+                        )
+                        embed.timestamp = datetime.now(timezone.utc)
+                        await interaction.followup.send(embed=embed)
+                        return
 
                     chunked = [filtered[i:i+25] for i in range(0, len(filtered), 25)]
 
