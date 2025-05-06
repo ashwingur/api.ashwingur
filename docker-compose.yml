@@ -74,7 +74,15 @@ services:
     networks:
       - app_network
     volumes:
-      - ./shared_images:/images
+      - ./shared_images:/images # Shared folder with Flask
+
+  discord_bot:
+    container_name: discord_bot
+    build: ./discord_bot
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+    networks:
+      - app_network
 
 volumes:
   pgdata: {}
