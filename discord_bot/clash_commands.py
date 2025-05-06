@@ -68,7 +68,7 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
         embed.add_field(name=clan1["name"], value=f"💥: {clan1['destructionPercentage']:.1f}%\n⭐: {clan1['stars']}\n⚔️: {clan1['attacks']}", inline=True)
         embed.add_field(name=clan2["name"], value=f"💥: {clan2['destructionPercentage']:.1f}%\n⭐: {clan2['stars']}\n⚔️: {clan2['attacks']}", inline=True)
 
-        if state == "In war":
+        if state == "In War":
             attacks_todo = [
                 member["name"]
                 for member in clan1["members"]
