@@ -41,7 +41,7 @@ async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
 async def create_clan_war_embed(data, clan_war, max_attacks: int):
     embed = discord.Embed(
     title=f"War Info: {data.get('name', 'Unknown')}",
-    description=f"Tag: {data.get('tag')}",
+    description=f"Tag: [{data.get('tag')}](https://www.ashwingur.com/ClashOfClans/clan/{data.get('tag').replace('#','')})",
     color=discord.Color.green()
     )
 
@@ -109,7 +109,7 @@ def format_seconds_to_time_string(seconds: int) -> str:
     hours = int(total_hours % 24)
 
     parts = []
-    if days > 0 and hours == 0:
+    if days == 1 and hours == 0:
         # Show full hours instead of "1d 0h"
         parts.append(f"{days * 24}h")
     else:
@@ -158,9 +158,9 @@ def create_capital_raid_embed(data, clan_tag):
             member_string += f'{member["name"]: <17} {member["capitalResourcesLooted"]:,}{attacks_info}\n'
 
     embed = discord.Embed(
-        title=f'Latest Capital Raid ({clan_tag})',
+        title=f"Latest Capital Raid ({clan_tag})",
         color=discord.Color.green(),
-        description=f"{start_date} – {end_date} ({state.capitalize()})"
+        description=f"[{start_date} – {end_date} ({state.capitalize()})](https://www.ashwingur.com/ClashOfClans/clan/{clan_tag.replace('#','')}/ClanCapitalRaidSeasons)"
     )
 
     embed.add_field(name="Total Loot <:CapitalGold:1369496549138235402>", value=f"{total_loot:,}", inline=True)
@@ -282,8 +282,8 @@ class ClashCommands(commands.Cog):
             await channel.send(f"Error: {e}")
 
     @app_commands.command(name="activity", description="Check when TheOrganisation members were last active")
-    @app_commands.describe(days="Days ago to filter by (default = 7)", name="Player name, overrides days filter (optional)")
-    async def activity(self, interaction: discord.Interaction, days: int = 7, name: str = None):
+    @app_commands.describe(days="Days ago to filter by (default = 5)", name="Player name, overrides days filter (optional)")
+    async def activity(self, interaction: discord.Interaction, days: int = 5, name: str = None):
         """
         Send player history, applying any relevant name and day filters.
         """
@@ -318,36 +318,46 @@ class ClashCommands(commands.Cog):
                     
                     if not filtered:
                         embed = discord.Embed(
-                            title=f'Player Last Action',
+                            title='Player Last Action',
                             color=discord.Color.dark_grey(),
-                            description=f"No players matching search"
+                            description="No players matching search criteria"
                         )
                         embed.timestamp = datetime.now(timezone.utc)
                         await interaction.followup.send(embed=embed)
                         return
 
-                    chunked = [filtered[i:i+25] for i in range(0, len(filtered), 25)]
+                    # Sort filtered list by time_difference or activity date if you want
+                    lines = []
+                    for item in filtered:
+                        activity_date = datetime.fromisoformat(item["activity_change_date"])
+                        time_difference = (current_time - activity_date).total_seconds()
+                        time_string = format_seconds_to_time_string(time_difference)
+                        lines.append(f'{item["name"]: <17} {time_string}')
 
-                    for i, chunk in enumerate(chunked):
+                    # Chunk lines into multiple fields within 1024-char limits
+                    chunks = []
+                    current_chunk = ""
+
+                    for line in lines:
+                        line += "\n"
+                        if len(current_chunk) + len(line) > MAX_EMBED_FIELD_LENGTH - 6:  # 6 chars for ``` wrapper
+                            chunks.append(f"```{current_chunk}```")
+                            current_chunk = line
+                        else:
+                            current_chunk += line
+
+                    if current_chunk:
+                        chunks.append(f"```{current_chunk}```")
+
+                    # Send all chunks as embed fields
+                    for i, chunk in enumerate(chunks):
                         embed = discord.Embed(
                             title=f'Player Last Action{" (cont.)" if i > 0 else ""}',
                             color=discord.Color.green(),
                             description=f"*Mostly accurate* :chart_with_upwards_trend: " + (f'(last {days} days)' if not name else '')
                         )
                         embed.timestamp = datetime.now(timezone.utc)
-                        for item in chunk:
-
-                            activity_date = datetime.fromisoformat(item["activity_change_date"])
-                            time_difference = (current_time - activity_date).total_seconds()
-
-                            time_string = format_seconds_to_time_string(time_difference)
-
-                            embed.add_field(
-                                name=f'{item["name"]}',
-                                value=f"{time_string}",
-                                inline=True
-                            )
-
+                        embed.add_field(name=f"Players ({len(filtered)})" if i == 0 else "\u200b", value=chunk, inline=False)
                         await interaction.followup.send(embed=embed)
 
         except Exception as e:
