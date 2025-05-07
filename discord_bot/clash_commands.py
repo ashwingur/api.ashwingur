@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 BASE_URL = "http://flask_app:5000"
 DEFAULT_CLAN_TAG = "#220QP2GGU"
+MAX_EMBED_FIELD_LENGTH = 1024
 
 GUILD_ID = 1081503290132545596
 CHANNEL_BOT = 1089437682679165028
@@ -155,7 +156,6 @@ def create_capital_raid_embed(data, clan_tag):
         for member in data["members"]:
             attacks_info = f' ({member["attacks"]}/6)' if member["attacks"] < 6 else ""
             member_string += f'{member["name"]: <17} {member["capitalResourcesLooted"]:,}{attacks_info}\n'
-        member_string = f"```{member_string}```"
 
     embed = discord.Embed(
         title=f'Latest Capital Raid ({clan_tag})',
@@ -170,8 +170,25 @@ def create_capital_raid_embed(data, clan_tag):
     embed.add_field(name="Total Attacks <:RaidSwordSingle:1369496556859818034>", value=str(total_attacks), inline=True)
     embed.add_field(name="Districts Destroyed <:DistrictHall:1369496551075872799>", value=str(districts_destroyed), inline=True)
 
-    if member_string != "":
-        embed.add_field(name=f"Players ({len(data['members'])})", value=member_string)
+    if member_string:
+        # Split into chunks of 1024 or less, while preserving line breaks
+        chunks = []
+        current_chunk = ""
+
+        for line in member_string.splitlines(keepends=True):
+            if len(current_chunk) + len(line) > MAX_EMBED_FIELD_LENGTH - 6:  # -6 for opening/closing backticks
+                chunks.append(f"```{current_chunk}```")
+                current_chunk = line
+            else:
+                current_chunk += line
+
+        if current_chunk:
+            chunks.append(f"```{current_chunk}```")
+
+        # Add each chunk as a separate field
+        for i, chunk in enumerate(chunks):
+            name = f"Players ({len(data['members'])})" if i == 0 else "\u200b"  # empty name for follow-ups
+            embed.add_field(name=name, value=chunk, inline=False)
 
     return embed, data["startTime"], data["endTime"]
 
