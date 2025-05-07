@@ -14,6 +14,7 @@ DEFAULT_CLAN_TAG = "#220QP2GGU"
 GUILD_ID = 1081503290132545596
 CHANNEL_BOT = 1089437682679165028
 CHANNEL_WAR = 1081513755415949393
+CHANNEL_CLAN_CAPITAL = 1081513938606362704
 
 async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
     """
@@ -119,12 +120,69 @@ def format_seconds_to_time_string(seconds: int) -> str:
     parts.append(f"{minutes}m")
     return " ".join(parts)
 
+def format_coc_timestamp_to_day_month(timestamp_str: str) -> str:
+    """
+    Converts a Clash of Clans-style timestamp (e.g., '20250505T092622.000Z')
+    to a formatted date string like '5 May' (no leading zero).
+    """
+    try:
+        dt = datetime.strptime(timestamp_str, "%Y%m%dT%H%M%S.%fZ")
+        dt = dt.replace(tzinfo=timezone.utc)
+        return f"{dt.day} {dt.strftime('%b')}"  # e.g., '5 May'
+    except ValueError as e:
+        raise ValueError(f"Invalid timestamp format: {timestamp_str}") from e
+
+def create_capital_raid_embed(data, clan_tag):
+    """
+    Create a Discord embed for the latest capital raid, including relevant details.
+    Returns the embed, startTime, and endTime.
+    """
+    data = data["items"][0]  # Assuming data is the first item in the response
+
+    total_loot = data.get("capitalTotalLoot", 0)
+    offensive_reward = data.get("offensiveReward", 0)
+    defensive_reward = data.get("defensiveReward", 0)
+    raids_completed = data.get("raidsCompleted", 0)
+    total_attacks = data.get("totalAttacks", 0)
+    districts_destroyed = data.get("enemyDistrictsDestroyed", 0)
+    state: str = data.get("state", "N/A State")
+    start_date = format_coc_timestamp_to_day_month(data["startTime"])
+    end_date = format_coc_timestamp_to_day_month(data["endTime"])
+
+    member_string = ""
+    if "members" in data:
+        data["members"].sort(key=lambda x: -x["capitalResourcesLooted"])
+        for member in data["members"]:
+            attacks_info = f' ({member["attacks"]}/6)' if member["attacks"] < 6 else ""
+            member_string += f'{member["name"]: <17} {member["capitalResourcesLooted"]:,}{attacks_info}\n'
+        member_string = f"```{member_string}```"
+
+    embed = discord.Embed(
+        title=f'Latest Capital Raid ({clan_tag})',
+        color=discord.Color.green(),
+        description=f"{start_date} – {end_date} ({state.capitalize()})"
+    )
+
+    embed.add_field(name="Total Loot <:CapitalGold:1369496549138235402>", value=f"{total_loot:,}", inline=True)
+    embed.add_field(name="Offensive Reward <:RaidMedal:1369496553445658735>", value=f"{offensive_reward:,}", inline=True)
+    embed.add_field(name="Defensive Reward <:RaidMedal:1369496553445658735>", value=f"{defensive_reward:,}", inline=True)
+    embed.add_field(name="Raids Completed <:RaidSwords:1369496555194810448>", value=str(raids_completed), inline=True)
+    embed.add_field(name="Total Attacks <:RaidSwordSingle:1369496556859818034>", value=str(total_attacks), inline=True)
+    embed.add_field(name="Districts Destroyed <:DistrictHall:1369496551075872799>", value=str(districts_destroyed), inline=True)
+
+    if member_string != "":
+        embed.add_field(name=f"Players ({len(data['members'])})", value=member_string)
+
+    return embed, data["startTime"], data["endTime"]
+
 class ClashCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.last_sent_war_end_time = None
         self.last_sent_war_prep_time = None
+        self.last_sent_capital_end_time = None
         self.send_daily_war_status.start()
+        self.send_weekly_raid_log.start()
 
     @app_commands.command(name="war", description="Check the current war status")
     @app_commands.describe(clan_tag="The tag of the clan (optional)")
@@ -243,7 +301,7 @@ class ClashCommands(commands.Cog):
                     
                     if not filtered:
                         embed = discord.Embed(
-                            title=f'Player Activity',
+                            title=f'Player Last Action',
                             color=discord.Color.dark_grey(),
                             description=f"No players matching search"
                         )
@@ -255,7 +313,7 @@ class ClashCommands(commands.Cog):
 
                     for i, chunk in enumerate(chunked):
                         embed = discord.Embed(
-                            title=f'Player Activity{" (cont.)" if i > 0 else ""}',
+                            title=f'Player Last Action{" (cont.)" if i > 0 else ""}',
                             color=discord.Color.green(),
                             description=f"*Mostly accurate* :chart_with_upwards_trend: " + (f'(last {days} days)' if not name else '')
                         )
@@ -278,8 +336,74 @@ class ClashCommands(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"Error: {e}")
 
+
+    @app_commands.command(name="raid", description="Provides the latest Clan Capital Raid")
+    @app_commands.describe(clan_tag="The tag of the clan (optional)")
+    async def clan_capital(self, interaction: discord.Interaction, clan_tag: str = DEFAULT_CLAN_TAG):
+        await interaction.response.defer()
+        url = f"{BASE_URL}/clashofclans/clan/{urllib.parse.quote(clan_tag)}/capitalraidseasons?limit=1"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        await interaction.followup.send("Unable to fetch clan capital data")
+                        return
+                    
+                    data = await resp.json()
+                    if not data.get('items') or len(data['items']) == 0:
+                        return interaction.followup.send(f"No capital raid data for clan {clan_tag}")
+                    embed, _, _ = create_capital_raid_embed(data, clan_tag)
+
+                    await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            await interaction.followup.send(f"Error: {e}")
+    
+    @tasks.loop(seconds=10)
+    async def send_weekly_raid_log(self):
+        guild_id = GUILD_ID
+        channel_id = CHANNEL_CLAN_CAPITAL
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return
+
+        url = f"{BASE_URL}/clashofclans/clan/{urllib.parse.quote(DEFAULT_CLAN_TAG)}/capitalraidseasons?limit=1"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        return
+                    
+                    data = await resp.json()
+                    if not data.get('items') or len(data['items']) == 0:
+                        return
+                    embed, _, end_time = create_capital_raid_embed(data, DEFAULT_CLAN_TAG)
+
+                    elapsed = seconds_since_coc_timestamp(end_time)
+
+                    # Send end time 3 hours before
+                    should_send_end = (
+                        0 < elapsed < 3600 and end_time != self.last_sent_capital_end_time
+                    )
+
+                    if should_send_end:
+                        await channel.send(embed=embed)
+                        self.last_sent_capital_end_time = end_time
+
+        except Exception as e:
+            await channel.send(f"Error: {e}")
+
     @send_daily_war_status.before_loop
-    async def before_send(self):
+    async def before_send_war(self):
+        await self.bot.wait_until_ready()
+
+    @send_weekly_raid_log.before_loop
+    async def before_send_raid(self):
         await self.bot.wait_until_ready()
 
 async def setup(bot):
