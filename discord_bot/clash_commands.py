@@ -298,7 +298,8 @@ class ClashCommands(commands.Cog):
                         return
                     
                     data = await resp.json()
-                    data.sort(key=lambda x: -x["view_count"])
+                    # Sort by activity ascending
+                    data.sort(key=lambda x: datetime.fromisoformat(x["activity_change_date"]) if x.get("activity_change_date") else datetime.max.replace(tzinfo=timezone.utc), reverse=True)
                     current_time = datetime.now(timezone.utc)
                     seconds = days * 24 * 60 * 60 
 
