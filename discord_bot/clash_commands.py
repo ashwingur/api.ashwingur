@@ -5,17 +5,23 @@ import aiohttp
 import urllib.parse
 from discord.ext import commands, tasks
 import os
-from typing import Tuple, Optional
+from typing import List, Tuple, Optional
 from datetime import datetime, timezone
 
 BASE_URL = "http://flask_app:5000"
 DEFAULT_CLAN_TAG = "#220QP2GGU"
 MAX_EMBED_FIELD_LENGTH = 1024
+COC_BEARER_TOKEN = os.getenv("COC_BEARER_TOKEN")
+COC_PROXY_URL = "https://cocproxy.royaleapi.dev/v1"
+COC_PROXY_HEADERS = {
+    "Authorization": f"Bearer {COC_BEARER_TOKEN}",
+}
 
 GUILD_ID = 1081503290132545596
 CHANNEL_BOT = 1089437682679165028
 CHANNEL_WAR = 1081513755415949393
 CHANNEL_CLAN_CAPITAL = 1081513938606362704
+CHANNEL_GENERAL = 1081503290132545599
 
 async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
     """
@@ -198,8 +204,10 @@ class ClashCommands(commands.Cog):
         self.last_sent_war_end_time = None
         self.last_sent_war_prep_time = None
         self.last_sent_capital_end_time = None
+        self.clan_members: Optional[List] = None
         self.send_daily_war_status.start()
         self.send_weekly_raid_log.start()
+        self.check_membership_change.start()
 
     @app_commands.command(name="war", description="Check the current war status")
     @app_commands.describe(clan_tag="The tag of the clan (optional)")
@@ -425,6 +433,118 @@ class ClashCommands(commands.Cog):
 
         except Exception as e:
             await channel.send(f"Error: {e}")
+    
+    @tasks.loop(seconds=120)
+    async def check_membership_change(self):
+        """
+        Monitors and notifies the following events: Player joins, player leaves, role changes
+        """
+        guild_id = GUILD_ID
+        channel_id = CHANNEL_GENERAL
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return
+
+        encoded_tag = urllib.parse.quote(DEFAULT_CLAN_TAG)
+        url = f"{COC_PROXY_URL}/clans/{encoded_tag}/members"
+
+        # Mapping roles to an index for comparison (promotion/demotion)
+        role_map = {
+            "member": 0,
+            "admin": 1,
+            "coLeader": 2,
+            "leader": 3,
+        }
+
+        role_display_map = {
+            "member": "Member",
+            "admin": "Elder",
+            "coLeader": "Co-leader",
+            "leader": "Supreme Leader",
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=COC_PROXY_HEADERS) as resp:
+                    if resp.status != 200:
+                        return
+
+                    data = (await resp.json()).get("items")
+                    # We dont have previous state when starting up the bot so skip the first call
+                    if not self.clan_members:
+                        self.clan_members = data
+                        return                    
+                    
+                    previous_tags = {member["tag"] for member in self.clan_members}
+                    current_tags = {member["tag"] for member in data}
+
+                    joined_tags = current_tags - previous_tags
+                    left_tags = previous_tags - current_tags
+                    common_tags = current_tags & previous_tags
+
+                    current_members_by_tag = {member["tag"]: member for member in data}
+                    previous_members_by_tag = {member["tag"]: member for member in self.clan_members}
+
+                    for tag in joined_tags:
+                        joined_member = current_members_by_tag[tag]
+                        embed = discord.Embed(
+                            title=f'Membership Change',
+                            color=discord.Color.green(),
+                            description=f"[{joined_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{joined_member['tag'].replace('#','')}) joined [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
+                        embed.add_field(name="Trophies 🏆", value=str(joined_member["trophies"]))
+                        embed.add_field(name="Builder Trophies 🏆", value=str(joined_member["builderBaseTrophies"]))
+                        embed.add_field(name="Town Hall 🏠", value=str(joined_member["townHallLevel"]))
+                        embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
+                        embed.timestamp = datetime.now(timezone.utc)
+                        await channel.send(embed=embed)
+
+                    for tag in left_tags:
+                        left_member = previous_members_by_tag[tag]
+                        embed = discord.Embed(
+                            title=f'Membership Change',
+                            color=discord.Color.red(),
+                            description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/was kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
+                        embed.add_field(name="Trophies 🏆", value=str(left_member["trophies"]))
+                        embed.add_field(name="Builder Trophies 🏆", value=str(left_member["builderBaseTrophies"]))
+                        embed.add_field(name="Town Hall 🏠", value=str(left_member["townHallLevel"]))
+                        embed.add_field(name="Exp Level", value=str(left_member["expLevel"]))
+                        embed.timestamp = datetime.now(timezone.utc)
+                        await channel.send(embed=embed)
+                    
+                    for tag in common_tags:
+                        old_role = previous_members_by_tag[tag]["role"]
+                        new_role = current_members_by_tag[tag]["role"]
+                        
+                        if old_role != new_role:
+                            old_role_index = role_map[old_role]
+                            new_role_index = role_map[new_role]
+                            
+                            # Check if it's a promotion or demotion
+                            if new_role_index > old_role_index:
+                                change_type = "Promotion"
+                                role_change = f"promoted to **{role_display_map[new_role]}**"
+                            elif new_role_index < old_role_index:
+                                change_type = "Demotion"
+                                role_change = f"demoted to **{role_display_map[new_role]}**"
+                            else:
+                                continue  # No role change, just skip
+                            
+                            member = current_members_by_tag[tag]
+                            embed = discord.Embed(
+                                title=f'{change_type} - {member["name"]}',
+                                color=discord.Color.orange(),
+                                description=f"[{member['name']}](https://www.ashwingur.com/ClashOfClans/player/{member['tag'].replace('#','')}) has been {role_change}"
+                            )
+                            await channel.send(embed=embed)
+
+                    self.clan_members = data
+
+
+        except Exception as e:
+            await channel.send(f"Error: {e}")
 
     @send_daily_war_status.before_loop
     async def before_send_war(self):
@@ -432,6 +552,10 @@ class ClashCommands(commands.Cog):
 
     @send_weekly_raid_log.before_loop
     async def before_send_raid(self):
+        await self.bot.wait_until_ready()
+
+    @check_membership_change.before_loop
+    async def before_check_membership_change(self):
         await self.bot.wait_until_ready()
 
 async def setup(bot):

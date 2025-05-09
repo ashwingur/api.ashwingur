@@ -81,6 +81,7 @@ services:
     build: ./discord_bot
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - COC_BEARER_TOKEN=${COC_BEARER_TOKEN}
     networks:
       - app_network
 
