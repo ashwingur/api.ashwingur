@@ -71,8 +71,8 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
         embed.add_field(name="War Status", value=state, inline=False)
         embed.add_field(name="Time Until War Ends", value=time_remaining, inline=False)
 
-        embed.add_field(name=clan1["name"], value=f"💥: {clan1['destructionPercentage']:.1f}%\n⭐: {clan1['stars']}\n⚔️: {clan1['attacks']}", inline=True)
-        embed.add_field(name=clan2["name"], value=f"💥: {clan2['destructionPercentage']:.1f}%\n⭐: {clan2['stars']}\n⚔️: {clan2['attacks']}", inline=True)
+        embed.add_field(name=clan1["name"], value=f"⭐: {clan1['stars']}\n⚔️: {clan1['attacks']}\n💥: {clan1['destructionPercentage']:.1f}%", inline=True)
+        embed.add_field(name=clan2["name"], value=f"⭐: {clan2['stars']}\n⚔️: {clan2['attacks']}\n💥: {clan2['destructionPercentage']:.1f}%", inline=True)
 
         if state == "In War":
             attacks_todo = [
@@ -434,7 +434,7 @@ class ClashCommands(commands.Cog):
         except Exception as e:
             await channel.send(f"Error: {e}")
     
-    @tasks.loop(seconds=120)
+    @tasks.loop(seconds=120) # Clan caching is 2min
     async def check_membership_change(self):
         """
         Monitors and notifies the following events: Player joins, player leaves, role changes
@@ -499,6 +499,7 @@ class ClashCommands(commands.Cog):
                         embed.add_field(name="Town Hall 🏠", value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
+                        embed.set_thumbnail(url=data.get("league", {}).get("iconUrls", {}).get("small"))
                         await channel.send(embed=embed)
 
                     for tag in left_tags:
@@ -507,10 +508,7 @@ class ClashCommands(commands.Cog):
                             title=f'Membership Change',
                             color=discord.Color.red(),
                             description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/was kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
-                        embed.add_field(name="Trophies 🏆", value=str(left_member["trophies"]))
-                        embed.add_field(name="Builder Trophies 🏆", value=str(left_member["builderBaseTrophies"]))
                         embed.add_field(name="Town Hall 🏠", value=str(left_member["townHallLevel"]))
-                        embed.add_field(name="Exp Level", value=str(left_member["expLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
                         await channel.send(embed=embed)
                     
