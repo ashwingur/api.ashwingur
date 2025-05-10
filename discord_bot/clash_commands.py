@@ -7,6 +7,7 @@ from discord.ext import commands, tasks
 import os
 from typing import List, Tuple, Optional
 from datetime import datetime, timezone
+from collections import Counter
 
 BASE_URL = "http://flask_app:5000"
 DEFAULT_CLAN_TAG = "#220QP2GGU"
@@ -22,6 +23,28 @@ CHANNEL_BOT = 1089437682679165028
 CHANNEL_WAR = 1081513755415949393
 CHANNEL_CLAN_CAPITAL = 1081513938606362704
 CHANNEL_GENERAL = 1081503290132545599
+
+# Townhall emoji ids <TH{level}:id>
+townhall_map = {
+    1: "1370746329260888114",
+    2: "1370746331043336262",
+    3: "1370746332771516567",
+    4: "1370746339863822336",
+    5: "1370746343202754761",
+    6: "1370746345584984074",
+    7: "1370746348105895976",
+    8: "1370746350093729812",
+    9: "1370746351922712690",
+    10: "1370746353734385735",
+    11: "1370746355332546630",
+    12: "1370746357371109376",
+    13: "1370746359019475034",
+    14: "1370746361124880435",
+    15: "1370746363494666321",
+    16: "1370746366355312802",
+    17: "1370746369010040892",
+    18: "1370746329260888114",
+}
 
 async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
     """
@@ -47,7 +70,7 @@ async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
 async def create_clan_war_embed(data, clan_war, max_attacks: int):
     embed = discord.Embed(
     title=f"War Info: {data.get('name', 'Unknown')}",
-    description=f"Tag: [{data.get('tag')}](https://www.ashwingur.com/ClashOfClans/clan/{data.get('tag').replace('#','')})",
+    description=f"Tag: [{data.get('tag')}](https://www.ashwingur.com/ClashOfClans/clan/{data.get('tag').replace('#','')})\n{clan_war['teamSize']} vs {clan_war['teamSize']}",
     color=discord.Color.green()
     )
 
@@ -71,8 +94,19 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
         embed.add_field(name="War Status", value=state, inline=False)
         embed.add_field(name="Time Until War Ends", value=time_remaining, inline=False)
 
-        embed.add_field(name=clan1["name"], value=f"⭐: {clan1['stars']}\n⚔️: {clan1['attacks']}\n💥: {clan1['destructionPercentage']:.1f}%", inline=True)
-        embed.add_field(name=clan2["name"], value=f"⭐: {clan2['stars']}\n⚔️: {clan2['attacks']}\n💥: {clan2['destructionPercentage']:.1f}%", inline=True)
+        clan1_summary = f"⭐: {clan1['stars']}\n⚔️: {clan1['attacks']} / {clan_war['teamSize']*max_attacks}\n💥: {clan1['destructionPercentage']:.1f}%\n\n" if state == "In War" else ""
+        clan2_summary = f"⭐: {clan2['stars']}\n⚔️: {clan2['attacks']} / {clan_war['teamSize']*max_attacks}\n💥: {clan2['destructionPercentage']:.1f}%\n\n" if state == "In War" else ""
+
+        # Get a summary of townhall numbers in each clan
+        clan1_townhalls = dict(sorted(Counter(member["townhallLevel"] for member in clan1["members"]).items(), reverse=True))
+        clan2_townhalls = dict(sorted(Counter(member["townhallLevel"] for member in clan2["members"]).items(), reverse=True))
+
+        clan1_summary += ' , '.join(f"{count} <:TH{level}:{townhall_map[level]}>" for level, count in clan1_townhalls.items())
+        clan2_summary += ' , '.join(f"{count} <:TH{level}:{townhall_map[level]}>" for level, count in clan2_townhalls.items())
+
+
+        embed.add_field(name=clan1["name"], value=clan1_summary, inline=True)
+        embed.add_field(name=clan2["name"], value=clan2_summary, inline=True)
 
         if state == "In War":
             attacks_todo = [
@@ -491,12 +525,12 @@ class ClashCommands(commands.Cog):
                     for tag in joined_tags:
                         joined_member = current_members_by_tag[tag]
                         embed = discord.Embed(
-                            title=f'Membership Change',
+                            title=f'Membership Update',
                             color=discord.Color.green(),
                             description=f"[{joined_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{joined_member['tag'].replace('#','')}) joined [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
                         embed.add_field(name="Trophies 🏆", value=str(joined_member["trophies"]))
                         embed.add_field(name="Builder Trophies 🏆", value=str(joined_member["builderBaseTrophies"]))
-                        embed.add_field(name="Town Hall 🏠", value=str(joined_member["townHallLevel"]))
+                        embed.add_field(name=f'Town Hall <:TH{joined_member["townHallLevel"]}:{townhall_map[joined_member["townHallLevel"]]}>', value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
                         embed.set_thumbnail(url=joined_member.get("league", {}).get("iconUrls", {}).get("small"))
@@ -505,10 +539,9 @@ class ClashCommands(commands.Cog):
                     for tag in left_tags:
                         left_member = previous_members_by_tag[tag]
                         embed = discord.Embed(
-                            title=f'Membership Change',
+                            title=f'Membership Update',
                             color=discord.Color.red(),
                             description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/was kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
-                        embed.add_field(name="Town Hall 🏠", value=str(left_member["townHallLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
                         await channel.send(embed=embed)
                     
