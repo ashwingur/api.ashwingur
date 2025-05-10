@@ -499,7 +499,7 @@ class ClashCommands(commands.Cog):
                         embed.add_field(name="Town Hall 🏠", value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
-                        embed.set_thumbnail(url=data.get("league", {}).get("iconUrls", {}).get("small"))
+                        embed.set_thumbnail(url=joined_member.get("league", {}).get("iconUrls", {}).get("small"))
                         await channel.send(embed=embed)
 
                     for tag in left_tags:

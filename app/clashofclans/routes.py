@@ -165,6 +165,11 @@ def update_player_activity():
                     value = next((x.get("value") for x in data.get("achievements") if x["name"] == a), None)
                     new_activity_state[a] = value
                 
+                # War preference will be null if player was kicked from the clan, which will be a false positive change from 'in' or 'out'
+                # Therefore if war preference is null, copy it from the previous value
+                if player.last_activity_state and not new_activity_state["warPreference"]:
+                    new_activity_state["warPreference"] = player.last_activity_state["warPreference"]
+                
                 if new_activity_state != player.last_activity_state:
                     # Player made an action between the 2 states
                     player.activity_change_date = player.last_state_date
