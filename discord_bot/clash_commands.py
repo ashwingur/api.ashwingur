@@ -541,7 +541,7 @@ class ClashCommands(commands.Cog):
                         embed = discord.Embed(
                             title=f'Membership Update',
                             color=discord.Color.red(),
-                            description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/was kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
+                            description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
                         embed.timestamp = datetime.now(timezone.utc)
                         await channel.send(embed=embed)
                     
