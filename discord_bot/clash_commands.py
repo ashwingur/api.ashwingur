@@ -285,7 +285,6 @@ class ClashCommands(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
                     if resp.status != 200:
-                        await channel.send("Unable to fetch clan data")
                         return
 
                     data = await resp.json()
@@ -430,7 +429,7 @@ class ClashCommands(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"Error: {e}")
     
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=300)
     async def send_weekly_raid_log(self):
         guild_id = GUILD_ID
         channel_id = CHANNEL_CLAN_CAPITAL
@@ -458,7 +457,7 @@ class ClashCommands(commands.Cog):
 
                     # Send end time 3 hours before
                     should_send_end = (
-                        0 < elapsed < 3600 and end_time != self.last_sent_capital_end_time
+                        290 < elapsed < 3600 and end_time != self.last_sent_capital_end_time
                     )
 
                     if should_send_end:
