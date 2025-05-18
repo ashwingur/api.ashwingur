@@ -255,11 +255,13 @@ class ClashCommands(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
                     if resp.status != 200:
-                        await interaction.followup.send("Unable to fetch clan data")
+                        await interaction.followup.send("Unable to fetch clan data.")
                         return
 
                     data = await resp.json()
                     clan_war, max_attacks = await get_current_clan_war(data)
+                    if not clan_war:
+                        await interaction.followup.send("Clan is not in war or war log is private.")
                     embed = await create_clan_war_embed(data, clan_war, max_attacks)
 
                     await interaction.followup.send(embed=embed)
