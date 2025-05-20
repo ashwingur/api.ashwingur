@@ -270,14 +270,14 @@ class ClashCommands(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"Error: {e}")
 
-    @app_commands.command(name="events", description="Check current and upcoming clash of clans events")
+    @app_commands.command(name="events", description="Check current and upcoming Clash of Clans events")
     async def events(self, interaction: discord.Interaction):
         events = get_clash_events()
 
         embed = discord.Embed(
             title=f"Event dates 📅",
             color=discord.Color.dark_magenta(),
-            description=f"Ongoing and upcoming clash of clans events"
+            description=f"Ongoing and upcoming COC events"
         )
 
         for event in events:
