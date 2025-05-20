@@ -277,7 +277,7 @@ class ClashCommands(commands.Cog):
 
         embed = discord.Embed(
             title=f"Event dates 📅",
-            color=discord.Color.green(),
+            color=discord.Color.dark_magenta(),
             description=f"Ongoing and upcoming clash of clans events"
         )
 
@@ -289,13 +289,12 @@ class ClashCommands(commands.Cog):
 
             msg = ""
             if ongoing:
-                msg += f"⏳ Ends in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+                msg += f"🟢 Ends in `{format_seconds_to_time_string(time_remaining.total_seconds())}`"
             else:
-                msg += f"Event starts in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+                msg += f"🟡 Starts in {format_seconds_to_time_string(time_remaining.total_seconds())}"
 
             embed.add_field(name=name, value=msg, inline=False)
 
-        embed.timestamp = datetime.now(timezone.utc)
         await interaction.followup.send(embed=embed)
 
 
