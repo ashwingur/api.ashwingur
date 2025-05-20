@@ -300,7 +300,6 @@ class ClashCommands(commands.Cog):
 
     @tasks.loop(seconds=300)  # Run every 5 min
     async def send_daily_war_status(self):
-        return
         guild_id = GUILD_ID
         channel_id = CHANNEL_WAR
         guild = self.bot.get_guild(guild_id)
