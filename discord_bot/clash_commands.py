@@ -8,6 +8,7 @@ import os
 from typing import List, Tuple, Optional
 from datetime import datetime, timezone
 from collections import Counter
+from clash_events import get_clash_events
 
 BASE_URL = "http://flask_app:5000"
 DEFAULT_CLAN_TAG = "#220QP2GGU"
@@ -268,6 +269,35 @@ class ClashCommands(commands.Cog):
 
         except Exception as e:
             await interaction.followup.send(f"Error: {e}")
+
+    @app_commands.command(name="events", description="Check current and upcoming clash of clans events")
+    async def war(self, interaction: discord.Interaction):
+        events = get_clash_events()
+
+        embed = discord.Embed(
+            title=f"Event dates",
+            color=discord.Color.green(),
+            description=f"Ongoing and upcoming clash of clans events"
+        )
+
+        for event in events:
+            name = event["event"]
+            ongoing = event["ongoing"]
+            event_datetime = event["datetime"]
+            time_remaining = event["time_remaining"]
+
+            msg = ""
+            if ongoing:
+                msg += f"Status: Event ongoing, ends in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+            else:
+                msg += f"Status: Event starts in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+
+            embed.add_field(name=name, value=msg)
+
+        embed.timestamp()
+        await interaction.followup.send(embed=embed)
+
+
 
     @tasks.loop(seconds=300)  # Run every 5 min
     async def send_daily_war_status(self):
