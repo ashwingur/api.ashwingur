@@ -291,7 +291,7 @@ class ClashCommands(commands.Cog):
             if ongoing:
                 msg += f"🟢 Ends in `{format_seconds_to_time_string(time_remaining.total_seconds())}`"
             else:
-                msg += f"🟡 Starts in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+                msg += f"🟡 Starts in `{format_seconds_to_time_string(time_remaining.total_seconds())}`"
 
             embed.add_field(name=name, value=msg, inline=False)
 
