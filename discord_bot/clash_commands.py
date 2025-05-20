@@ -272,7 +272,6 @@ class ClashCommands(commands.Cog):
 
     @app_commands.command(name="events", description="Check current and upcoming clash of clans events")
     async def war(self, interaction: discord.Interaction):
-        await interaction.response.defer()
         events = get_clash_events()
 
         embed = discord.Embed(
@@ -295,7 +294,7 @@ class ClashCommands(commands.Cog):
 
             embed.add_field(name=name, value=msg, inline=False)
 
-        await interaction.followup.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
 
 
