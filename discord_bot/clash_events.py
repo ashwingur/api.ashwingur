@@ -54,16 +54,19 @@ def get_clash_events(now=None):
     clan_ongoing, clan_time, clan_remaining = get_event_status(now, cg_start, cg_end)
 
     # ===== Raid Weekend =====
-    # Friday - Monday 5AM UTC every month
+    # Starts Friday 7am UTC, ends Monday 7am UTC
     weekday = now.weekday()
-    days_to_friday = (4 - weekday) % 7
-    days_to_monday = (7 - weekday) % 7
-    raid_start = datetime.combine((now + timedelta(days=days_to_friday)).date(), time(7, 0), tzinfo=UTC)
-    raid_end = datetime.combine((now + timedelta(days=days_to_monday)).date(), time(7, 0), tzinfo=UTC)
 
-    if now < raid_start - timedelta(days=3):  # Mon–Wed before the next Friday
-        raid_start -= timedelta(days=7)
-        raid_end -= timedelta(days=7)
+    # Find the most recent Friday
+    days_since_friday = (weekday - 4) % 7
+    last_friday = datetime.combine((now - timedelta(days=days_since_friday)).date(), time(7, 0), tzinfo=UTC)
+    raid_start = last_friday
+    raid_end = raid_start + timedelta(days=3)  # Friday 7am to Monday 7am
+
+    # If we've passed this weekend's end, calculate the next
+    if now >= raid_end:
+        raid_start += timedelta(days=7)
+        raid_end += timedelta(days=7)
 
     raid_ongoing, raid_time, raid_remaining = get_event_status(now, raid_start, raid_end)
 
@@ -101,16 +104,9 @@ def get_clash_events(now=None):
             "time_remaining": raid_remaining,
         },
         {
-            "event": "Gold Pass",
+            "event": "Season Pass",
             "ongoing": gold_ongoing,
             "datetime": gold_time,
             "time_remaining": gold_remaining,
         },
     ]
-
-
-
-events = get_clash_events()
-
-for event in events:
-    print(event)

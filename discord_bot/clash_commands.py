@@ -272,10 +272,11 @@ class ClashCommands(commands.Cog):
 
     @app_commands.command(name="events", description="Check current and upcoming clash of clans events")
     async def war(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         events = get_clash_events()
 
         embed = discord.Embed(
-            title=f"Event dates",
+            title=f"Event dates 📅",
             color=discord.Color.green(),
             description=f"Ongoing and upcoming clash of clans events"
         )
@@ -288,19 +289,20 @@ class ClashCommands(commands.Cog):
 
             msg = ""
             if ongoing:
-                msg += f"Status: Event ongoing, ends in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+                msg += f"⏳ Ends in {format_seconds_to_time_string(time_remaining.total_seconds())}"
             else:
-                msg += f"Status: Event starts in {format_seconds_to_time_string(time_remaining.total_seconds())}"
+                msg += f"Event starts in {format_seconds_to_time_string(time_remaining.total_seconds())}"
 
-            embed.add_field(name=name, value=msg)
+            embed.add_field(name=name, value=msg, inline=False)
 
-        embed.timestamp()
+        embed.timestamp = datetime.now(timezone.utc)
         await interaction.followup.send(embed=embed)
 
 
 
     @tasks.loop(seconds=300)  # Run every 5 min
     async def send_daily_war_status(self):
+        return
         guild_id = GUILD_ID
         channel_id = CHANNEL_WAR
         guild = self.bot.get_guild(guild_id)
