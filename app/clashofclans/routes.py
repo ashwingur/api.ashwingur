@@ -291,6 +291,33 @@ def gold_pass():
 
     return jsonify(gold_response.json()), 200
 
+@bp.route('/clan/<string:tag>/currentwar', methods=['GET'])
+@limiter.limit('15/minute', override_defaults=True)
+def get_current_war(tag):
+    """
+    Retrieves information about a clan's current war
+    """
+    tag = tag.replace("#", "%23")
+    war_response = requests.get(f"{BASE_URL}/clans/{tag}/currentwar", headers=headers)
+
+    if war_response.status_code != 200:
+        return jsonify({"success": False, "error": war_response.json().get("message")}), war_response.status_code
+
+    return jsonify(war_response.json()), 200
+
+@bp.route('/clanwarleagues/wars/<string:war_tag>', methods=['GET'])
+@limiter.limit('15/minute', override_defaults=True)
+def get_current_CWL_war(war_tag):
+    """
+    Retrieves information about a CWL war
+    """
+    war_tag = war_tag.replace("#", "%23")
+    war_response = requests.get(f"{BASE_URL}/clanwarleagues/wars/{war_tag}", headers=headers)
+
+    if war_response.status_code != 200:
+        return jsonify({"success": False, "error": war_response.json().get("message")}), war_response.status_code
+
+    return jsonify(war_response.json()), 200
 
 @bp.route('/fullclan/<string:tag>', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
