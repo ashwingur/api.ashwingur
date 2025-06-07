@@ -1,4 +1,5 @@
 import sys
+import unicodedata
 import discord
 from discord import app_commands
 import aiohttp
@@ -46,6 +47,12 @@ townhall_map = {
     17: "1370746369010040892",
     18: "1370746329260888114",
 }
+
+def strip_accents(text):
+    return ''.join(
+        c for c in unicodedata.normalize('NFKD', text)
+        if not unicodedata.combining(c)
+    ).lower()
 
 async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
     """
@@ -379,7 +386,8 @@ class ClashCommands(commands.Cog):
                         name = name.lower()
                         filtered = [
                             item for item in data
-                            if name in item.get("name", "").lower() and item.get("clan_tag") == DEFAULT_CLAN_TAG
+                            if strip_accents(item.get("name", "")) and name in strip_accents(item.get("name", ""))
+                            and item.get("clan_tag") == DEFAULT_CLAN_TAG
                             and item.get("activity_change_date")
                         ]
                     else:
