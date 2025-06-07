@@ -280,6 +280,20 @@ def get_player_by_tag(tag):
     schema = CocPlayerSchema()
     return jsonify(schema.dump(player)), 200
 
+@bp.route('/players/<string:tag>/profile', methods=['GET'])
+@limiter.limit('15/minute', override_defaults=True)
+def get_player_profile(tag):
+    """
+    Retrieves a player's ingame data
+    """
+    tag = tag.replace("#", "%23")
+    player_response = requests.get(f"{BASE_URL}/players/{tag}", headers=headers)
+
+    if player_response.status_code != 200:
+        return jsonify({"success": False, "error": player_response.json().get("message")}), player_response.status_code
+
+    return jsonify(player_response.json()), 200
+
 
 @bp.route('/goldpass', methods=['GET'])
 @limiter.limit('40/minute', override_defaults=True)
@@ -318,6 +332,22 @@ def get_current_CWL_war(war_tag):
         return jsonify({"success": False, "error": war_response.json().get("message")}), war_response.status_code
 
     return jsonify(war_response.json()), 200
+
+@bp.route('/clan/<string:tag>/warlog', methods=['GET'])
+@limiter.limit('15/minute', override_defaults=True)
+def get_war_log(tag):
+    """
+    Retrieves a clan's war log
+    """
+    tag = tag.replace("#", "%23")
+    war_log_response = requests.get(f"{BASE_URL}/clans/{tag}/warlog", headers=headers)
+
+    if war_log_response.status_code == 403:
+        return jsonify({"success": False, "error": "Private war log"}), war_log_response.status_code
+    if war_log_response.status_code != 200:
+        return jsonify({"success": False, "error": war_log_response.json().get("message")}), war_log_response.status_code
+
+    return jsonify(war_log_response.json()), 200
 
 @bp.route('/fullclan/<string:tag>', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
