@@ -247,9 +247,17 @@ class ClashCommands(commands.Cog):
         self.last_sent_war_prep_time = None
         self.last_sent_capital_end_time = None
         self.clan_members: Optional[List] = None
+        self.clan_data = None # To store previous full clan data for other property checks
         self.send_daily_war_status.start()
         self.send_weekly_raid_log.start()
         self.check_membership_change.start()
+        self.check_clan_properties_change.start() # Start the new loop for clan properties
+
+    def cog_unload(self):
+        self.send_daily_war_status.cancel()
+        self.send_weekly_raid_log.cancel()
+        self.check_membership_change.cancel()
+        self.check_clan_properties_change.cancel() # Cancel the new task
 
     @app_commands.command(name="war", description="Check the current war status")
     @app_commands.describe(clan_tag="The tag of the clan (optional)")
@@ -270,6 +278,7 @@ class ClashCommands(commands.Cog):
                     clan_war, max_attacks = await get_current_clan_war(data)
                     if not clan_war:
                         await interaction.followup.send("Clan is not in war or war log is private.")
+                        return
                     embed = await create_clan_war_embed(data, clan_war, max_attacks)
 
                     await interaction.followup.send(embed=embed)
@@ -302,7 +311,6 @@ class ClashCommands(commands.Cog):
             embed.add_field(name=name, value=msg, inline=False)
 
         await interaction.response.send_message(embed=embed)
-
 
 
     @tasks.loop(seconds=300)  # Run every 5 min
@@ -521,7 +529,7 @@ class ClashCommands(commands.Cog):
             return
 
         encoded_tag = urllib.parse.quote(DEFAULT_CLAN_TAG)
-        url = f"{COC_PROXY_URL}/clans/{encoded_tag}/members"
+        url = f"{COC_PROXY_URL}/clans/{encoded_tag}"
 
         # Mapping roles to an index for comparison (promotion/demotion)
         role_map = {
@@ -542,24 +550,29 @@ class ClashCommands(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=COC_PROXY_HEADERS) as resp:
                     if resp.status != 200:
+                        # Log error or send a message to admin if API is not responding
+                        print(f"Error fetching clan data for membership: {resp.status}")
                         return
 
-                    data = (await resp.json()).get("items")
-                    # We dont have previous state when starting up the bot so skip the first call
+                    full_clan_data = await resp.json() # Fetch full data
+                    current_member_list = full_clan_data.get("memberList")
+
+                    # We don't have previous state when starting up the bot so skip the first call
                     if not self.clan_members:
-                        self.clan_members = data
-                        return                    
-                    
+                        self.clan_members = current_member_list
+                        return
+
                     previous_tags = {member["tag"] for member in self.clan_members}
-                    current_tags = {member["tag"] for member in data}
+                    current_tags = {member["tag"] for member in current_member_list}
 
                     joined_tags = current_tags - previous_tags
                     left_tags = previous_tags - current_tags
                     common_tags = current_tags & previous_tags
 
-                    current_members_by_tag = {member["tag"]: member for member in data}
+                    current_members_by_tag = {member["tag"]: member for member in current_member_list}
                     previous_members_by_tag = {member["tag"]: member for member in self.clan_members}
 
+                    # Handle joined members
                     for tag in joined_tags:
                         joined_member = current_members_by_tag[tag]
                         embed = discord.Embed(
@@ -568,12 +581,13 @@ class ClashCommands(commands.Cog):
                             description=f"[{joined_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{joined_member['tag'].replace('#','')}) joined [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
                         embed.add_field(name="Trophies 🏆", value=str(joined_member["trophies"]))
                         embed.add_field(name="Builder Trophies 🏆", value=str(joined_member["builderBaseTrophies"]))
-                        embed.add_field(name=f'Town Hall <:TH{joined_member["townHallLevel"]}:{townhall_map[joined_member["townHallLevel"]]}>', value=str(joined_member["townHallLevel"]))
+                        embed.add_field(name=f'Town Hall <:TH{joined_member["townHallLevel"]}:{townhall_map.get(joined_member["townHallLevel"], "unknown_emoji_id")}>', value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
                         embed.set_thumbnail(url=joined_member.get("league", {}).get("iconUrls", {}).get("small"))
                         await channel.send(embed=embed)
 
+                    # Handle left members
                     for tag in left_tags:
                         left_member = previous_members_by_tag[tag]
                         embed = discord.Embed(
@@ -582,7 +596,8 @@ class ClashCommands(commands.Cog):
                             description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
                         embed.timestamp = datetime.now(timezone.utc)
                         await channel.send(embed=embed)
-                    
+
+                    # Handle role changes for common members
                     for tag in common_tags:
                         old_role = previous_members_by_tag[tag]["role"]
                         new_role = current_members_by_tag[tag]["role"]
@@ -591,7 +606,6 @@ class ClashCommands(commands.Cog):
                             old_role_index = role_map[old_role]
                             new_role_index = role_map[new_role]
                             
-                            # Check if it's a promotion or demotion
                             if new_role_index > old_role_index:
                                 change_type = "Promotion"
                                 role_change = f"promoted to **{role_display_map[new_role]}**"
@@ -599,7 +613,7 @@ class ClashCommands(commands.Cog):
                                 change_type = "Demotion"
                                 role_change = f"demoted to **{role_display_map[new_role]}**"
                             else:
-                                continue  # No role change, just skip
+                                continue # Should not happen if old_role != new_role, but as a safeguard
                             
                             member = current_members_by_tag[tag]
                             embed = discord.Embed(
@@ -609,11 +623,169 @@ class ClashCommands(commands.Cog):
                             )
                             await channel.send(embed=embed)
 
-                    self.clan_members = data
-
+                    self.clan_members = current_member_list
 
         except Exception as e:
-            await channel.send(f"Error: {e}")
+            await channel.send(f"Error checking membership: {e}")
+            print(f"Error checking membership: {e}") # Log the error
+
+    @tasks.loop(seconds=120) # Clan caching is 2min
+    async def check_clan_properties_change(self):
+        """
+        Monitors and notifies changes in various clan properties.
+        """
+        guild_id = GUILD_ID
+        channel_id = CHANNEL_GENERAL
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return
+
+        encoded_tag = urllib.parse.quote(DEFAULT_CLAN_TAG)
+        url = f"{COC_PROXY_URL}/clans/{encoded_tag}"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=COC_PROXY_HEADERS) as resp:
+                    if resp.status != 200:
+                        print(f"Error fetching clan data for properties: {resp.status}")
+                        return
+
+                    current_clan_data = await resp.json()
+
+                    # Initialize clan_data on first run
+                    if not self.clan_data:
+                        self.clan_data = current_clan_data
+                        return
+
+                    previous_clan_data = self.clan_data
+                    changes = []
+
+                    # 1. Check 'type'
+                    if current_clan_data.get("type") != previous_clan_data.get("type"):
+                        changes.append(f"Clan Type changed from **{previous_clan_data.get('type', 'N/A')}** to **{current_clan_data.get('type', 'N/A')}**")
+
+                    # 2. Check 'description'
+                    if current_clan_data.get("description") != previous_clan_data.get("description"):
+                        changes.append(f"Clan Description changed:\nOld: ```{previous_clan_data.get('description', 'N/A')}```\nNew: ```{current_clan_data.get('description', 'N/A')}```")
+
+                    # 3. Check 'location' name
+                    prev_location_name = previous_clan_data.get("location", {}).get("name")
+                    curr_location_name = current_clan_data.get("location", {}).get("name")
+                    if curr_location_name != prev_location_name:
+                        changes.append(f"Clan Location changed from **{prev_location_name or 'N/A'}** to **{curr_location_name or 'N/A'}**")
+
+                    # 4. Check 'isFamilyFriendly'
+                    if current_clan_data.get("isFamilyFriendly") != previous_clan_data.get("isFamilyFriendly"):
+                        changes.append(f"Clan Family Friendly status changed from **{previous_clan_data.get('isFamilyFriendly', 'N/A')}** to **{current_clan_data.get('isFamilyFriendly', 'N/A')}**")
+
+                    # 5. Check 'badge' (just detect if badge URL changed)
+                    prev_badge_url = previous_clan_data.get("badgeUrls", {}).get("large")
+                    curr_badge_url = current_clan_data.get("badgeUrls", {}).get("large")
+                    if curr_badge_url != prev_badge_url:
+                        changes.append(f"Clan Badge has changed!")
+
+                    # 6. Check 'clanLevel'
+                    if current_clan_data.get("clanLevel") != previous_clan_data.get("clanLevel"):
+                        changes.append(f"Clan Level changed from **{previous_clan_data.get('clanLevel', 'N/A')}** to **{current_clan_data.get('clanLevel', 'N/A')}**")
+
+                    # 7. Check 'capitalLeague.name'
+                    prev_capital_league = previous_clan_data.get("capitalLeague", {}).get("name")
+                    curr_capital_league = current_clan_data.get("capitalLeague", {}).get("name")
+                    if curr_capital_league != prev_capital_league:
+                        changes.append(f"Clan Capital League changed from **{prev_capital_league or 'N/A'}** to **{curr_capital_league or 'N/A'}**")
+
+                    # 8. Check 'requiredTrophies'
+                    if current_clan_data.get("requiredTrophies") != previous_clan_data.get("requiredTrophies"):
+                        changes.append(f"Required Trophies changed from **{previous_clan_data.get('requiredTrophies', 'N/A')}** to **{current_clan_data.get('requiredTrophies', 'N/A')}**")
+
+                    # 9. Check 'warFrequency'
+                    if current_clan_data.get("warFrequency") != previous_clan_data.get("warFrequency"):
+                        changes.append(f"War Frequency changed from **{previous_clan_data.get('warFrequency', 'N/A')}** to **{current_clan_data.get('warFrequency', 'N/A')}**")
+
+                    # 10. Check 'isWarLogPublic'
+                    if current_clan_data.get("isWarLogPublic") != previous_clan_data.get("isWarLogPublic"):
+                        changes.append(f"War Log Public status changed from **{previous_clan_data.get('isWarLogPublic', 'N/A')}** to **{current_clan_data.get('isWarLogPublic', 'N/A')}**")
+
+                    # 11. Check 'warLeague.name'
+                    prev_war_league = previous_clan_data.get("warLeague", {}).get("name")
+                    curr_war_league = current_clan_data.get("warLeague", {}).get("name")
+                    if curr_war_league != prev_war_league:
+                        changes.append(f"War League changed from **{prev_war_league or 'N/A'}** to **{curr_war_league or 'N/A'}**")
+
+                    # 12. Check 'requiredBuilderBaseTrophies'
+                    prev_required_bb_trophies = previous_clan_data.get("requiredBuilderBaseTrophies")
+                    curr_required_bb_trophies = current_clan_data.get("requiredBuilderBaseTrophies")
+                    if curr_required_bb_trophies != prev_required_bb_trophies:
+                        changes.append(f"Required Builder Base Trophies changed from **{prev_required_bb_trophies or 'N/A'}** to **{curr_required_bb_trophies or 'N/A'}**")
+
+                    # 13. Check 'chatLanguage.name'
+                    prev_chat_language = previous_clan_data.get("chatLanguage", {}).get("name")
+                    curr_chat_language = current_clan_data.get("chatLanguage", {}).get("name")
+                    if curr_chat_language != prev_chat_language:
+                        changes.append(f"Chat Language changed from **{prev_chat_language or 'N/A'}** to **{curr_chat_language or 'N/A'}**")
+
+                    # 14. Check 'requiredTownhallLevel'
+                    prev_required_th_level = previous_clan_data.get("requiredTownhallLevel")
+                    curr_required_th_level = current_clan_data.get("requiredTownhallLevel")
+                    if curr_required_th_level != prev_required_th_level:
+                        changes.append(f"Required Townhall Level changed from **{prev_required_th_level or 'N/A'}** to **{curr_required_th_level or 'N/A'}**")
+
+                    # 15. Check 'clanCapital.capitalHallLevel'
+                    prev_capital_hall_level = previous_clan_data.get("clanCapital", {}).get("capitalHallLevel")
+                    curr_capital_hall_level = current_clan_data.get("clanCapital", {}).get("capitalHallLevel")
+                    if curr_capital_hall_level != prev_capital_hall_level:
+                        changes.append(f"Clan Capital Hall levelled up from **{prev_capital_hall_level or 'N/A'}** to **{curr_capital_hall_level or 'N/A'}**")
+
+                    # 16. Check 'clanCapital.districts' (districtHallLevel changes)
+                    prev_districts = {d["id"]: d for d in previous_clan_data.get("clanCapital", {}).get("districts", [])}
+                    curr_districts = {d["id"]: d for d in current_clan_data.get("clanCapital", {}).get("districts", [])}
+
+                    for district_id, curr_district in curr_districts.items():
+                        if district_id in prev_districts:
+                            prev_district = prev_districts[district_id]
+                            if curr_district.get("districtHallLevel") != prev_district.get("districtHallLevel"):
+                                changes.append(f"District '{curr_district.get('name', 'Unknown District')}' Hall Level levelled up from **{prev_district.get('districtHallLevel', 'N/A')}** to **{curr_district.get('districtHallLevel', 'N/A')}**")
+                        else:
+                            # New district added (less common, but good to cover)
+                            changes.append(f"New District '{curr_district.get('name', 'Unknown District')}' (Level: **{curr_district.get('districtHallLevel', 'N/A')}**) added to Clan Capital.")
+
+                    # 17. Check 'labels' (name changes, additions, removals)
+                    prev_labels = {label["id"]: label["name"] for label in previous_clan_data.get("labels", [])}
+                    curr_labels = {label["id"]: label["name"] for label in current_clan_data.get("labels", [])}
+
+                    # Check for changes in existing labels or new labels
+                    for label_id, curr_label_name in curr_labels.items():
+                        if label_id in prev_labels:
+                            if curr_label_name != prev_labels[label_id]:
+                                changes.append(f"Label '{prev_labels[label_id]}' changed name to **{curr_label_name}**.")
+                        else:
+                            changes.append(f"New Label added: **{curr_label_name}**.")
+
+                    # Check for removed labels
+                    for label_id, prev_label_name in prev_labels.items():
+                        if label_id not in curr_labels:
+                            changes.append(f"Label removed: **{prev_label_name}**.")
+
+                    # Send notification if any changes were detected
+                    if changes:
+                        embed = discord.Embed(
+                            title="Clan Changes Detected",
+                            color=discord.Color.blue(),
+                            description="\n".join(changes)
+                        )
+                        embed.timestamp = datetime.now(timezone.utc)
+                        await channel.send(embed=embed)
+
+                    # Update the stored clan data for the next check
+                    self.clan_data = current_clan_data
+
+        except Exception as e:
+            await channel.send(f"Error checking clan properties: {e}")
+            print(f"Error checking clan properties: {e}") # Log the error
+
 
     @send_daily_war_status.before_loop
     async def before_send_war(self):
@@ -626,6 +798,11 @@ class ClashCommands(commands.Cog):
     @check_membership_change.before_loop
     async def before_check_membership_change(self):
         await self.bot.wait_until_ready()
+
+    @check_clan_properties_change.before_loop
+    async def before_check_clan_properties_change(self):
+        await self.bot.wait_until_ready()
+
 
 async def setup(bot):
     await bot.add_cog(ClashCommands(bot))
