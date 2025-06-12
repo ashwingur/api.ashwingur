@@ -55,6 +55,8 @@ def create_app(config_class=Config):
                   r"/*": {"origins": "*", "supports_credentials": True}})
     # Initialise rate limiter
     limiter.init_app(app)
+    if Config.FLASK_ENV == "DEV":
+        limiter.enabled = False
     # Initialise login manager
     login_manager.init_app(app)
     # Initialise websocket module
