@@ -747,7 +747,7 @@ class ClashCommands(commands.Cog):
                         if district_id in prev_districts:
                             prev_district = prev_districts[district_id]
                             if curr_district.get("districtHallLevel") != prev_district.get("districtHallLevel"):
-                                changes.append(f"District '{curr_district.get('name', 'Unknown District')}' Hall Level levelled up from **{prev_district.get('districtHallLevel', 'N/A')}** to **{curr_district.get('districtHallLevel', 'N/A')}**")
+                                changes.append(f"District '{curr_district.get('name', 'Unknown District')}' levelled up from **{prev_district.get('districtHallLevel', 'N/A')}** to **{curr_district.get('districtHallLevel', 'N/A')}**")
                         else:
                             # New district added (less common, but good to cover)
                             changes.append(f"New District '{curr_district.get('name', 'Unknown District')}' (Level: **{curr_district.get('districtHallLevel', 'N/A')}**) added to Clan Capital.")
