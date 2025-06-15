@@ -1,10 +1,7 @@
 import sys
 import discord
 import os
-from discord import app_commands
 from discord.ext import commands
-import aiohttp
-import urllib.parse
 from pprint import pprint
 
 intents = discord.Intents.default()
@@ -17,6 +14,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     await bot.load_extension("clash_commands")
     await bot.load_extension("transportopendata_commands")
+    await bot.load_extension("torn_commands")
     
     try:
         synced = await bot.tree.sync()

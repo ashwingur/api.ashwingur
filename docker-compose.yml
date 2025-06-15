@@ -82,6 +82,7 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - COC_BEARER_TOKEN=${COC_BEARER_TOKEN}
+      - TORN_API_KEY=${TORN_API_KEY}
     networks:
       - app_network
 
