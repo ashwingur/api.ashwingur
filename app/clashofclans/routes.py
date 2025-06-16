@@ -307,7 +307,7 @@ def gold_pass():
 
 @bp.route('/clan/<string:tag>/currentwar', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
-def get_current_war(tag):
+def get_current_regular_war(tag):
     """
     Retrieves information about a clan's current war
     """
@@ -332,6 +332,89 @@ def get_current_CWL_war(war_tag):
         return jsonify({"success": False, "error": war_response.json().get("message")}), war_response.status_code
 
     return jsonify(war_response.json()), 200
+
+def current_active_war(tag):
+    """
+    Retrieves the current active war of the clan, whether it is a regular or CWL war.
+    This will take longer to run because it goes through all CWL wars if they exist
+    Return value: war_data, error_message, status_code
+    """
+    tag = tag.replace("#", "%23")
+    war_url = f"{BASE_URL}/clans/{tag}/currentwar"
+    leaguegroup_url = f"{BASE_URL}/clans/{tag}/currentwar/leaguegroup"
+
+    def fetch(url):
+        return requests.get(url, headers=headers)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(fetch, url) for url in [war_url, leaguegroup_url]]
+        war_response, leaguegroup_response = [f.result() for f in futures]
+
+    leaguegroup_response = requests.get(leaguegroup_url, headers=headers)
+    if not leaguegroup_response.ok and leaguegroup_response.status_code != 404:
+        return None, leaguegroup_response.json().get("message"), leaguegroup_response.status_code
+    if not war_response.ok and war_response.status_code != 403:
+        return None, war_response.json().get("message"), war_response.status_code
+    
+    def fetchCWLWar(url, war_tag):
+        response = requests.get(url, headers=headers)
+        if response.ok:
+            data = response.json()
+            data["war_tag"] = war_tag
+            return data
+        else:
+            return None
+    
+    if leaguegroup_response.ok:
+        leaguegroup_data = leaguegroup_response.json()
+        cwl_war_tags = []
+        for r in leaguegroup_data.get("rounds"):
+            for war_tag in r.get("warTags"):
+                if war_tag != "#0":
+                    cwl_war_tags.append(war_tag.replace("#", "%23"))
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(fetchCWLWar, f"{BASE_URL}/clanwarleagues/wars/{war_tag}", war_tag) for war_tag in cwl_war_tags]
+            cwl_wars = [f.result() for f in futures 
+                                 if f.result()]
+            
+            # Loop through and find the current active war
+            active_war = None
+            for war in cwl_wars:
+                war_tag = war.get("war_tag").replace("%23","#")
+
+                # If we are the opponent, swap oponent and clan
+                if war.get("opponent").get("tag") == tag:
+                    war["clan"], war["opponent"] = war["opponent"], war["clan"]
+                
+                if war["clan"].get("tag") == tag and war.get("state") == "inWar":
+                    active_war = war
+                # Preparation war is last priority if there's no ongoing wars (1st CWL war hasn't started yet)
+                if war["clan"].get("tag") == tag and war.get("state") == "preparation" and not active_war:
+                    active_war = war
+            return active_war, None, 200
+    
+    # Return the regular war
+    if war_response.ok:
+        war_data = war_response.json()
+        if war_data.get("state") == "notInWar":
+            return None, "No war found", 404
+        else:
+            return war_data, None, 200
+    else:
+        return None, "Private war log", 404
+            
+@bp.route('/clan/<string:tag>/activewar', methods=['GET'])
+@limiter.limit('15/minute', override_defaults=True)
+def get_curent_active_war(tag):
+    data, error, status = current_active_war(tag)
+
+    if error:
+        return jsonify({"success": False, "error": error}), status
+    
+    return jsonify(data), 200
+
+
+
 
 @bp.route('/clan/<string:tag>/warlog', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
@@ -373,11 +456,11 @@ def get_full_clan_data(tag):
     if not clan_response.ok:
         return jsonify({"success": False, "error": clan_response.json().get("message")}), clan_response.status_code
     if not capital_raid_response.ok:
-        return jsonify({"success": False, "error": clan_response.json().get("message")}), capital_raid_response.status_code
+        return jsonify({"success": False, "error": capital_raid_response.json().get("message")}), capital_raid_response.status_code
     if not war_response.ok and war_response.status_code != 403:
-        return jsonify({"success": False, "error": clan_response.json().get("message")}), capital_raid_response.status_code
+        return jsonify({"success": False, "error": war_response.json().get("message")}), capital_raid_response.status_code
     if not leaguegroup_response.ok and leaguegroup_response.status_code != 404:
-        return jsonify({"success": False, "error": clan_response.json().get("message")}), leaguegroup_response.status_code
+        return jsonify({"success": False, "error": leaguegroup_response.json().get("message")}), leaguegroup_response.status_code
     # League group can be 404 if CWL is not currently active
     # Current war is 403 if war log is not private
 

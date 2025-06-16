@@ -43,8 +43,29 @@ class CocPlayerData(db.Model):
 
     # Relationship to CocPlayer
     player = db.relationship('CocPlayer', backref=db.backref('historical_data', lazy=True))
-    
 
+class CocPlayerWarHistory(db.Model):
+    __tablename__ = 'coc_player_war_history'
+
+    """
+    For CWL we want to filter db by war end time, then check if an attack number 1 for player with specific tag exists
+    For regular war we filter by end time, then check if the attack order number exists for a player with a specific tag
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    war_end_timestamp = db.Column(db.DateTime(timezone=True), nullable=False)
+    tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag'), nullable=False)
+    attacker_townhall = db.Column(db.Integer, nullable=False)
+    map_position = db.Column(db.Integer, nullable=False)
+    defender_townhall = db.Column(db.Integer, nullable=False)
+    defender_tag = db.Column(db.String(15), nullable=False)
+    defender_map_position = db.Column(db.Integer, nullable=False)
+    destruction_percentage = db.Column(db.Integer, nullable=False)
+    duration = db.Column(db.Integer, nullable=False)
+    stars = db.Column(db.Integer, nullable=False)
+    attack_order = db.Column(db.Integer, nullable=False)
+
+    # Relationship to CocPlayer
+    player = db.relationship('CocPlayer', backref=db.backref('war_history', lazy=True))
 
 class CocPlayer(db.Model):
     __tablename__ = 'coc_player'

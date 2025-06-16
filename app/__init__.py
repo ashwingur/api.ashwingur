@@ -23,8 +23,6 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     app.secret_key = os.environ.get('FLASK_SECRET_KEY')
 
-    # limiter.enabled = False
-
     # Initialise flask extensions
     # Initialise sqlalchemy db
     db.init_app(app)
