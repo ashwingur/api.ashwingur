@@ -60,6 +60,7 @@ class CocPlayerWarHistory(db.Model):
     destruction_percentage = db.Column(db.Integer, nullable=False)
     duration = db.Column(db.Integer, nullable=False)
     stars = db.Column(db.Integer, nullable=False)
+    is_cwl = db.Column(db.Boolean, nullable=False, default=False)
 
     # Relationship to CocPlayer
     player = db.relationship('CocPlayer', backref=db.backref('war_history', lazy=True))

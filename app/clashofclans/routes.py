@@ -473,7 +473,8 @@ def update_war_history(tag):
                 destruction_percentage=destruction_percentage,
                 duration=duration,
                 stars=stars,
-                attack_order=attack_order
+                attack_order=attack_order,
+                is_cwl=data["isCwl"]
             )
 
             try:
