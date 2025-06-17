@@ -9,7 +9,7 @@ from sqlalchemy import and_
 from app.clashofclans import bp
 from app.extensions import db, limiter, get_real_ip
 from config import Config
-from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer, CocPlayerSchema
+from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer, CocPlayerSchema, CocPlayerWarHistory
 from dateutil import parser
 
 BASE_URL = "https://cocproxy.royaleapi.dev/v1"
@@ -376,8 +376,9 @@ def current_active_war(tag):
             futures = [executor.submit(fetchCWLWar, f"{BASE_URL}/clanwarleagues/wars/{war_tag}", war_tag) for war_tag in cwl_war_tags]
             cwl_wars = [f.result() for f in futures 
                                  if f.result()]
+            tag = tag.replace("%23", "#")
             
-            # Loop through and find the current active war
+            # Loop through and find the current active war (if no active then get preparation or ended war)
             active_war = None
             for war in cwl_wars:
                 war_tag = war.get("war_tag").replace("%23","#")
@@ -389,13 +390,15 @@ def current_active_war(tag):
                 if war["clan"].get("tag") == tag and war.get("state") == "inWar":
                     active_war = war
                 # Preparation war is last priority if there's no ongoing wars (1st CWL war hasn't started yet)
-                if war["clan"].get("tag") == tag and war.get("state") == "preparation" and not active_war:
+                if war["clan"].get("tag") == tag and war.get("state") in ["preparation", "warEnded"] and not active_war:
                     active_war = war
+            active_war["isCwl"] = True
             return active_war, None, 200
     
     # Return the regular war
     if war_response.ok:
         war_data = war_response.json()
+        war_data["isCwl"] = False
         if war_data.get("state") == "notInWar":
             return None, "No war found", 404
         else:
@@ -408,12 +411,82 @@ def current_active_war(tag):
 def get_curent_active_war(tag):
     data, error, status = current_active_war(tag)
 
-    if error:
+    if error or not data:
         return jsonify({"success": False, "error": error}), status
     
     return jsonify(data), 200
 
+@bp.route('/clan/<string:tag>/update_war_history', methods=['POST'])
+@limiter.limit('5/minute', override_defaults=True)
+def update_war_history(tag):
+    post_body = request.json
+    if 'password' not in post_body:
+            return jsonify({"success": False, 'error': 'password not provided'}), 400
+    if post_body['password'] != Config.PARKING_POST_PASSWORD:
+            return jsonify({"success": False, 'error': 'incorrect password'}), 400
+    
+    data, error, status = current_active_war(tag)
 
+    if error or not data:
+        return jsonify({"success": False, "error": error}), status
+    
+    if data["state"] not in ["inWar", "warEnded"]:
+        # No attacks to process
+        return jsonify({"success": True})
+    
+    war_end = datetime.strptime(data["endTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
+
+    for member in data["clan"]["members"]:
+        player_tag = member["tag"]
+        town_hall = member["townhallLevel"]
+        map_position = member["mapPosition"]
+
+        for attack in member.get("attacks", []):
+            attack_order = attack["order"]
+            defender_tag = attack["defenderTag"]
+
+            existing_entry = db.session.query(CocPlayerWarHistory).filter_by(
+                war_end_timestamp=war_end,
+                attack_order=attack_order
+            ).first()
+
+            if existing_entry:
+                continue
+
+            stars = attack["stars"]
+            destruction_percentage = attack["destructionPercentage"]
+            duration = attack["duration"]
+
+            # Need to find additional defender information
+            defender = next((p for p in data["opponent"]["members"] if p["tag"] == defender_tag), None)
+            defender_townhall = defender["townhallLevel"]
+            defender_map_position = defender["mapPosition"]
+
+            new_entry = CocPlayerWarHistory(
+                war_end_timestamp=war_end,
+                tag=player_tag,
+                attacker_townhall=town_hall,
+                map_position=map_position,
+                defender_townhall=defender_townhall,
+                defender_tag=defender_tag,
+                defender_map_position=defender_map_position,
+                destruction_percentage=destruction_percentage,
+                duration=duration,
+                stars=stars,
+                attack_order=attack_order
+            )
+
+            try:
+                db.session.add(new_entry)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+    
+    return jsonify({"success": True})
+    
+
+
+    
 
 
 @bp.route('/clan/<string:tag>/warlog', methods=['GET'])

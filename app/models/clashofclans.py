@@ -53,6 +53,7 @@ class CocPlayerWarHistory(db.Model):
     """
     id = db.Column(db.Integer, primary_key=True)
     war_end_timestamp = db.Column(db.DateTime(timezone=True), nullable=False)
+    attack_order = db.Column(db.Integer, nullable=False)
     tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag'), nullable=False)
     attacker_townhall = db.Column(db.Integer, nullable=False)
     map_position = db.Column(db.Integer, nullable=False)
@@ -62,7 +63,6 @@ class CocPlayerWarHistory(db.Model):
     destruction_percentage = db.Column(db.Integer, nullable=False)
     duration = db.Column(db.Integer, nullable=False)
     stars = db.Column(db.Integer, nullable=False)
-    attack_order = db.Column(db.Integer, nullable=False)
 
     # Relationship to CocPlayer
     player = db.relationship('CocPlayer', backref=db.backref('war_history', lazy=True))
