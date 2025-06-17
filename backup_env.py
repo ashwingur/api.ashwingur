@@ -54,7 +54,7 @@ def get_metadata():
 def include_object(object, name, type_, reflected, compare_to):
     if type_ == "table" and object.schema and 'timescaledb_' in object.schema:
         return False
-    if type_ == "index" and name == "sensor_data_timestamp_idx":
+    if type_ == "index" and name in ["sensor_data_timestamp_idx", "idx_parking_data_facility_id_timestamp"]:
         return False
     return True
 

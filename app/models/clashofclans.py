@@ -47,10 +47,7 @@ class CocPlayerData(db.Model):
 class CocPlayerWarHistory(db.Model):
     __tablename__ = 'coc_player_war_history'
 
-    """
-    For CWL we want to filter db by war end time, then check if an attack number 1 for player with specific tag exists
-    For regular war we filter by end time, then check if the attack order number exists for a player with a specific tag
-    """
+    # war_end_timestamp + attack_order will be unique
     id = db.Column(db.Integer, primary_key=True)
     war_end_timestamp = db.Column(db.DateTime(timezone=True), nullable=False)
     attack_order = db.Column(db.Integer, nullable=False)
