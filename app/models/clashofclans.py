@@ -121,3 +121,9 @@ class CocPlayerSchema(SQLAlchemyAutoSchema):
         model = CocPlayer
         load_instance = True
         exclude = ("last_activity_state", "last_state_date")
+
+class CocPlayerWarHistorySchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = CocPlayerWarHistory
+        load_instance = True
+        include_fk = True

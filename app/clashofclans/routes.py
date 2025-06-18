@@ -1,3 +1,4 @@
+from collections import defaultdict
 import concurrent.futures
 from datetime import datetime, timedelta
 import sys
@@ -5,11 +6,11 @@ from zoneinfo import ZoneInfo
 import concurrent
 from flask import jsonify, request, current_app
 import requests
-from sqlalchemy import and_
+from sqlalchemy import and_, func, or_
 from app.clashofclans import bp
 from app.extensions import db, limiter, get_real_ip
 from config import Config
-from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer, CocPlayerSchema, CocPlayerWarHistory
+from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer, CocPlayerSchema, CocPlayerWarHistory, CocPlayerWarHistorySchema
 from dateutil import parser
 
 BASE_URL = "https://cocproxy.royaleapi.dev/v1"
@@ -415,6 +416,84 @@ def get_curent_active_war(tag):
         return jsonify({"success": False, "error": error}), status
     
     return jsonify(data), 200
+
+@bp.route('/clan/<string:clan_tag>/warattackhistory', methods=['GET'])
+@limiter.limit('20/minute', override_defaults=True)
+def get_war_attack_history(clan_tag):
+    """
+     Retrieves war attack history of players for a given clan
+     Players can be specified by comma separated player_tags or player_names
+     If no names or tags are provided, it returns all the data for the timeframe.
+     A start and end date can be provided to override the default past 1 year timeframe
+    """
+    # Retrieves war attack history for a given clan and list of players (by tag or name)
+    player_tags_param = request.args.get("player_tags", "")
+    player_names_param = request.args.get("player_names", "")
+
+    player_tags = [tag.strip() for tag in player_tags_param.split(",") if tag.strip()]
+    player_names = [name.strip() for name in player_names_param.split(",") if name.strip()]
+
+    try:
+        start_date = request.args.get('start')
+        end_date = request.args.get('end')
+
+        if start_date:
+            start_date = parser.parse(start_date)
+        else:
+            start_date = datetime.now(ZoneInfo("UTC")) - timedelta(days=365)  # Default: 1 year ago (UTC)
+
+        if end_date:
+            end_date = parser.parse(end_date)  # Parses timezone if provided
+        else:
+            # Default now + 2 days so we also include ongoing wars
+            end_date = datetime.now(ZoneInfo("UTC")) + timedelta(days=365)
+
+    except ValueError:
+        return jsonify({"error": "Invalid datetime format. Use ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM)"}), 400
+    
+    query = CocPlayerWarHistory.query.join(CocPlayer).filter(
+        CocPlayer.clan_tag == clan_tag,
+        CocPlayerWarHistory.war_end_timestamp >= start_date,
+        CocPlayerWarHistory.war_end_timestamp <= end_date
+    )
+
+    # Filter by player tags or names
+    if player_tags or player_names:
+        player_filters = []
+        if player_tags:
+            player_filters.append(CocPlayer.tag.in_(player_tags))
+        for name in player_names:
+            search_term_processed = name # Only lowercase the search term
+            player_name_processed = func.unaccent(func.lower(CocPlayer.name)) # Only lowercase the database column
+            player_filters.append(player_name_processed.ilike(f"%{search_term_processed}%"))
+        query = query.filter(or_(*player_filters))
+
+    # Order by latest date (war_end_timestamp) and then attack_order
+    query = query.order_by(
+        CocPlayerWarHistory.war_end_timestamp.desc(),
+        CocPlayerWarHistory.attack_order.desc()
+    )
+
+    war_history_records = query.all()
+    schema = CocPlayerWarHistorySchema()
+
+    # Group by each player
+    player_war_history = defaultdict(list)
+
+    for attack in war_history_records:
+        player_tag = attack.tag
+        player_name = attack.player.name
+
+        player_war_history[(player_tag, player_name)].append(schema.dump(attack))
+    
+    final_response = [{
+        "tag": tag,
+        "name": name,
+        "attacks": attacks
+    } for (tag, name), attacks in player_war_history.items()]
+
+    return jsonify(final_response), 200
+
 
 @bp.route('/clan/<string:tag>/update_war_history', methods=['POST'])
 @limiter.limit('5/minute', override_defaults=True)
