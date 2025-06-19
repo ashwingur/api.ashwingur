@@ -504,10 +504,11 @@ class ClashCommands(commands.Cog):
                     if resp.status != 200:
                         await interaction.followup.send(f'Error: {data.get("error", "Unable to fetch attack history")}')
                         return
-
+                    
                     if not data:
                         await interaction.followup.send("No attack history found for the given criteria.")
                         return
+
 
                     # --- PRE-PROCESS DATA TO CALCULATE AVERAGES AND ADD TO PLAYER DICTS ---
                     processed_players = []
@@ -547,13 +548,17 @@ class ClashCommands(commands.Cog):
                         player['average_destruction'] = average_destruction
                         player['average_opponent_offset'] = average_opponent_offset
                         processed_players.append(player)
+                    
+                    
+                    if not processed_players:
+                        await interaction.followup.send("No attack history found for the given criteria.")
+                        return
 
                     # --- SORTING BY AVERAGE STARS DESCENDING ---
                     sorted_players = sorted(processed_players, key=lambda p: (-p["average_stars"], p["name"]))
 
                     # Prepare data for the table from the sorted list
                     table_data = []
-
                     for player in sorted_players: # Iterate over the *sorted* players
                         table_data.append([
                             player['name'],
@@ -575,7 +580,7 @@ class ClashCommands(commands.Cog):
                     CELL_TEXT_COLOR = "#DCDDDE"        
 
                     # Create the plot
-                    fig, ax = plt.subplots(figsize=(10, len(df) * 0.3), facecolor=BACKGROUND_COLOR) # Set figure background
+                    fig, ax = plt.subplots(figsize=(10, max(1.5, len(df) * 0.4)), facecolor=BACKGROUND_COLOR) # Set figure background
                     ax.axis('off')
 
                     # Create the table
