@@ -446,7 +446,7 @@ def get_war_attack_history(clan_tag):
             end_date = parser.parse(end_date)  # Parses timezone if provided
         else:
             # Default now + 2 days so we also include ongoing wars
-            end_date = datetime.now(ZoneInfo("UTC")) + timedelta(days=365)
+            end_date = datetime.now(ZoneInfo("UTC")) + timedelta(days=2)
 
     except ValueError:
         return jsonify({"error": "Invalid datetime format. Use ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM)"}), 400
