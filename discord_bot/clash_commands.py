@@ -463,7 +463,8 @@ class ClashCommands(commands.Cog):
         clan_tag="Optional: The tag of the clan to check",
         player_tags="Optional: Comma-separated player tags",
         player_names="Optional: Comma-separated player names",
-        days="Optional: Days ago to search from (default = 90)"
+        days="Optional: Days ago to search from (default = 90)",
+        cwl_only="Optional: Only show CWL attacks (default = False)"
     )
     async def attack_history_summary(
         self,
@@ -471,7 +472,8 @@ class ClashCommands(commands.Cog):
         clan_tag: str = DEFAULT_CLAN_TAG,
         player_tags: str = "",
         player_names: str = "",
-        days: int = 90
+        days: int = 90,
+        cwl_only: bool = False
     ):
         """
         Retrieves and summarizes the war attack history for specified players or a clan,
@@ -507,37 +509,59 @@ class ClashCommands(commands.Cog):
                         await interaction.followup.send("No attack history found for the given criteria.")
                         return
 
-                    # Prepare data for the table
-                    table_data = []
-                    for player in sorted(data, key=lambda p: p["name"].lower()):
+                    # --- PRE-PROCESS DATA TO CALCULATE AVERAGES AND ADD TO PLAYER DICTS ---
+                    processed_players = []
+                    for player in data:
                         total_stars = 0
                         total_duration = 0
                         total_destruction = 0
                         total_opponent_offset = 0
-                        num_attacks = len(player["attacks"])
-
-                        if num_attacks == 0:
-                            # Skip players with no attacks, or handle as needed
-                            continue
+                        num_attacks = 0
 
                         for attack in player["attacks"]:
+                            if cwl_only:
+                                if not attack.get("is_cwl", False):
+                                    continue
+                            
+                            num_attacks += 1
                             total_stars += attack["stars"]
                             total_duration += attack["duration"]
                             total_destruction += attack["destruction_percentage"]
                             total_opponent_offset += (attack["map_position"] - attack["defender_map_position"])
 
-                        average_stars = total_stars / num_attacks
-                        average_duration = total_duration / num_attacks
-                        average_destruction = total_destruction / num_attacks
-                        average_opponent_offset = total_opponent_offset / num_attacks
+                        # Handle division by zero if no attacks meet criteria
+                        if num_attacks == 0:
+                            average_stars = 0
+                            average_duration = 0
+                            average_destruction = 0
+                            average_opponent_offset = 0
+                        else:
+                            average_stars = total_stars / num_attacks
+                            average_duration = total_duration / num_attacks
+                            average_destruction = total_destruction / num_attacks
+                            average_opponent_offset = total_opponent_offset / num_attacks
+                        
+                        player['num_attacks'] = num_attacks
+                        player['average_stars'] = average_stars
+                        player['average_duration'] = average_duration
+                        player['average_destruction'] = average_destruction
+                        player['average_opponent_offset'] = average_opponent_offset
+                        processed_players.append(player)
 
+                    # --- SORTING BY AVERAGE STARS DESCENDING ---
+                    sorted_players = sorted(processed_players, key=lambda p: (-p["average_stars"], p["name"]))
+
+                    # Prepare data for the table from the sorted list
+                    table_data = []
+
+                    for player in sorted_players: # Iterate over the *sorted* players
                         table_data.append([
                             player['name'],
-                            f"{num_attacks}",
-                            f"{average_stars:.2f}",
-                            f"{average_destruction:.2f}",
-                            f"{average_duration:.2f}",
-                            f"{average_opponent_offset:.2f}"
+                            f"{player['num_attacks']}", # Use the filtered count
+                            f"{player['average_stars']:.2f}",
+                            f"{player['average_destruction']:.2f}",
+                            f"{player['average_duration']:.2f}",
+                            f"{player['average_opponent_offset']:.2f}"
                         ])
 
                     # Create a DataFrame for easier table rendering
@@ -575,7 +599,7 @@ class ClashCommands(commands.Cog):
                             cell.set_text_props(color=CELL_TEXT_COLOR) # Apply cell text color
                         cell.set_edgecolor('lightgray') # Cell borders
 
-                    plt.title(f"War Attack History Summary Averages ({days}d)", fontsize=16, pad=2, color=HEADER_TEXT_COLOR) # Apply title text color
+                    plt.title(f'{"CWL " if cwl_only else ""}War Attack History Summary Averages ({days}D)', fontsize=16, pad=2, color=HEADER_TEXT_COLOR) # Apply title text color
                     fig.tight_layout(rect=[0, 0, 1, 1]) # Adjust layout to prevent title overlap
 
                     # Save the plot to a BytesIO object
