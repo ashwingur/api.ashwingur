@@ -15,6 +15,7 @@ from clash_events import get_clash_events
 import matplotlib.pyplot as plt
 import pandas as pd
 import io
+from dateutil import parser
 
 BASE_URL = "http://flask_app:5000"
 DEFAULT_CLAN_TAG = "#220QP2GGU"
@@ -622,6 +623,138 @@ class ClashCommands(commands.Cog):
 
                     # Send the image as a Discord File directly
                     file = discord.File(buf, filename="attack_history_summary.png")
+                    await interaction.followup.send(file=file)
+
+        except aiohttp.ClientError as e:
+            await interaction.followup.send(f"Failed to connect to the API: {e}")
+        except json.JSONDecodeError:
+            await interaction.followup.send("Error: Could not parse response from the API.")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}", file=sys.stderr)
+            await interaction.followup.send(f"An unexpected error occurred: {e}")
+
+    @app_commands.command(name="attack_history_logs", description="Get the attack history of a single player (limit 50)")
+    @app_commands.describe(
+        clan_tag="Optional: The tag of the clan to check",
+        player_tag="Player tag",
+        player_name="Player name",
+        days="Optional: Days ago to search from (default = 30)",
+        cwl_only="Optional: Only show CWL attacks (default = False)"
+    )
+    async def attack_history_logs(
+        self,
+        interaction: discord.Interaction,
+        clan_tag: str = DEFAULT_CLAN_TAG,
+        player_tag: str = "",
+        player_name: str = "",
+        days: int = 90,
+        cwl_only: bool = False
+    ):
+        """
+        Retrieves and summarizes the war attack history for specified players or a clan,
+        calculating the average stars, destruction, duration and opponent map position offset.
+        """
+        await interaction.response.defer()
+
+        base_path = f"{BASE_URL}/clashofclans/clan/{urllib.parse.quote(clan_tag)}/warattackhistory"
+
+        if days <= 0:
+            days = 1
+        elif days > 3650:
+            days = 3650
+        start_date = datetime.now(ZoneInfo("UTC")) - timedelta(days=days)
+
+        query_params = urllib.parse.urlencode({
+            "player_tags": player_tag,
+            "player_names": player_name,
+            "start": start_date.isoformat()
+        })
+
+        full_url = f"{base_path}?{query_params}"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(full_url) as resp:
+                    data = await resp.json()
+                    if resp.status != 200:
+                        await interaction.followup.send(f'Error: {data.get("error", "Unable to fetch attack history")}')
+                        return
+                    
+                    if not data:
+                        await interaction.followup.send("No attack history found for the given criteria.")
+                        return
+                    
+                    player = data[0]
+                    table_data = []
+
+                    for attack in player["attacks"][:50]:
+                        if cwl_only:
+                            if not attack.get("is_cwl", False):
+                                continue
+                        
+                        end_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
+                        
+                        table_data.append([
+                            end_date.strftime('%d-%m-%y'),
+                            attack["stars"],
+                            attack["destruction_percentage"],
+                            attack["duration"],
+                            attack["attacker_townhall"],
+                            attack["defender_townhall"],
+                            attack["map_position"],
+                            attack["defender_map_position"]
+                        ])
+                    if not table_data:
+                        await interaction.followup.send("No attack history found for the given criteria.")
+                        return
+
+                    # Create a DataFrame for easier table rendering
+                    df = pd.DataFrame(table_data, columns=["Date", "Stars", "Destruction", "Duration", "TH", "Opponent TH", "Pos.", "Opponent Pos."])
+
+                    # --- COLOR DEFINITIONS ---
+                    BACKGROUND_COLOR = "#0E0E0E"
+                    HEADER_BACKGROUND_COLOR = "#07632D"
+                    HEADER_TEXT_COLOR = "#FFFFFF"      
+                    CELL_BACKGROUND_COLOR = "#23272A"  
+                    CELL_TEXT_COLOR = "#DCDDDE"        
+
+                    # Create the plot
+                    fig, ax = plt.subplots(figsize=(10, max(1.5, len(df) * 0.4)), facecolor=BACKGROUND_COLOR) # Set figure background
+                    ax.axis('off')
+
+                    # Create the table
+                    tbl = ax.table(cellText=df.values,
+                                   colLabels=df.columns,
+                                   cellLoc='center',
+                                   loc='center',
+                                   colWidths=[0.1, 0.08, 0.15, 0.15, 0.1, 0.15, 0.1, 0.15]) # Adjust column widths
+
+                    tbl.auto_set_font_size(False)
+                    tbl.set_fontsize(10)
+                    tbl.scale(1.2, 1.2) # Scale the table for better readability
+
+                    # Style headers
+                    for (row, col), cell in tbl.get_celld().items():
+                        if row == 0:
+                            cell.set_text_props(weight='bold', color=HEADER_TEXT_COLOR) # Apply header text color
+                            cell.set_facecolor(HEADER_BACKGROUND_COLOR) # Apply header background color
+                        else:
+                            cell.set_facecolor(CELL_BACKGROUND_COLOR if row % 2 == 0 else "#131618")
+                            cell.set_text_props(color=CELL_TEXT_COLOR) # Apply cell text color
+                        cell.set_edgecolor('lightgray') # Cell borders
+
+                    plt.title(f'{player["name"]} {"CWL " if cwl_only else ""}War Attack Logs ({days}D)', fontsize=16, pad=2, color=HEADER_TEXT_COLOR) # Apply title text color
+                    fig.tight_layout(rect=[0, 0, 1, 1]) # Adjust layout to prevent title overlap
+
+                    # Save the plot to a BytesIO object
+                    # Crucially, pass the facecolor of the figure to savefig to ensure the background is included
+                    buf = io.BytesIO()
+                    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, facecolor=fig.get_facecolor())
+                    buf.seek(0)
+                    plt.close(fig)
+
+                    # Send the image as a Discord File directly
+                    file = discord.File(buf, filename=f"{player['name']}_attack_history_log.png")
                     await interaction.followup.send(file=file)
 
         except aiohttp.ClientError as e:
