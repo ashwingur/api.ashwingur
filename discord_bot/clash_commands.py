@@ -517,6 +517,7 @@ class ClashCommands(commands.Cog):
                         total_duration = 0
                         total_destruction = 0
                         total_opponent_offset = 0
+                        total_townhall_offset = 0
                         num_attacks = 0
 
                         for attack in player["attacks"]:
@@ -529,6 +530,7 @@ class ClashCommands(commands.Cog):
                             total_duration += attack["duration"]
                             total_destruction += attack["destruction_percentage"]
                             total_opponent_offset += (attack["map_position"] - attack["defender_map_position"])
+                            total_townhall_offset += (attack["defender_townhall"] - attack["attacker_townhall"])
 
                         # Handle division by zero if no attacks meet criteria
                         if num_attacks == 0:
@@ -536,17 +538,20 @@ class ClashCommands(commands.Cog):
                             average_duration = 0
                             average_destruction = 0
                             average_opponent_offset = 0
+                            average_townhall_offset = 0
                         else:
                             average_stars = total_stars / num_attacks
                             average_duration = total_duration / num_attacks
                             average_destruction = total_destruction / num_attacks
                             average_opponent_offset = total_opponent_offset / num_attacks
+                            average_townhall_offset = total_townhall_offset / num_attacks
                         
                         player['num_attacks'] = num_attacks
                         player['average_stars'] = average_stars
                         player['average_duration'] = average_duration
                         player['average_destruction'] = average_destruction
                         player['average_opponent_offset'] = average_opponent_offset
+                        player['average_townhall_offset'] = average_townhall_offset
                         processed_players.append(player)
                     
                     
@@ -565,12 +570,13 @@ class ClashCommands(commands.Cog):
                             f"{player['num_attacks']}", # Use the filtered count
                             f"{player['average_stars']:.2f}",
                             f"{player['average_destruction']:.2f}",
-                            f"{player['average_duration']:.2f}",
-                            f"{player['average_opponent_offset']:.2f}"
+                            f"{player['average_duration']:.1f}",
+                            f"{player['average_townhall_offset']:.2f}",
+                            f"{player['average_opponent_offset']:.2f}",
                         ])
 
                     # Create a DataFrame for easier table rendering
-                    df = pd.DataFrame(table_data, columns=["Name", "Attacks", "Stars", "Destruction", "Duration", "± Opponent Pos."])
+                    df = pd.DataFrame(table_data, columns=["Name", "Attacks", "Stars", "Destruction", "Duration", "± Opponent TH", "± Opponent Pos."])
 
                     # --- COLOR DEFINITIONS ---
                     BACKGROUND_COLOR = "#0E0E0E"
@@ -588,7 +594,7 @@ class ClashCommands(commands.Cog):
                                    colLabels=df.columns,
                                    cellLoc='center',
                                    loc='center',
-                                   colWidths=[0.17, 0.1, 0.1, 0.15, 0.15, 0.15]) # Adjust column widths
+                                   colWidths=[0.15, 0.1, 0.1, 0.15, 0.15, 0.15, 0.15]) # Adjust column widths
 
                     tbl.auto_set_font_size(False)
                     tbl.set_fontsize(10)
@@ -824,7 +830,6 @@ class ClashCommands(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=COC_PROXY_HEADERS) as resp:
                     if resp.status != 200:
-                        print(f"Error fetching clan data for properties: {resp.status}")
                         return
 
                     current_clan_data = await resp.json()
@@ -957,7 +962,6 @@ class ClashCommands(commands.Cog):
                     self.clan_data = current_clan_data
 
         except Exception as e:
-            await channel.send(f"Error checking clan properties: {e}")
             print(f"Error checking clan properties: {e}") # Log the error
 
 
