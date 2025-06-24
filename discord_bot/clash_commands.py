@@ -896,6 +896,7 @@ class ClashCommands(commands.Cog):
                         embed.add_field(name="Builder Trophies 🏆", value=str(joined_member["builderBaseTrophies"]))
                         embed.add_field(name=f'Town Hall <:TH{joined_member["townHallLevel"]}:{townhall_map.get(joined_member["townHallLevel"], "unknown_emoji_id")}>', value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
+                        embed.add_field(name="Clan Size", value=str(len(current_member_list)))
                         embed.timestamp = datetime.now(timezone.utc)
                         embed.set_thumbnail(url=joined_member.get("league", {}).get("iconUrls", {}).get("small"))
                         await channel.send(embed=embed)
@@ -907,6 +908,7 @@ class ClashCommands(commands.Cog):
                             title=f'Membership Update',
                             color=discord.Color.red(),
                             description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
+                        embed.add_field(name="Clan Size", value=str(len(current_member_list)))
                         embed.timestamp = datetime.now(timezone.utc)
                         await channel.send(embed=embed)
 
@@ -998,6 +1000,7 @@ class ClashCommands(commands.Cog):
                     curr_badge_url = current_clan_data.get("badgeUrls", {}).get("large")
                     if curr_badge_url != prev_badge_url:
                         changes.append(f"Clan Badge has changed!")
+                        embed.set_thumbnail(url=current_clan_data.get("badgeUrls", {}).get("small"))
 
                     # 6. Check 'clanLevel'
                     if current_clan_data.get("clanLevel") != previous_clan_data.get("clanLevel"):
