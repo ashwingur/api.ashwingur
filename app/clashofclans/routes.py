@@ -527,7 +527,7 @@ def update_war_history(tag):
             defender_tag = attack["defenderTag"]
 
             existing_entry = db.session.query(CocPlayerWarHistory).filter_by(
-                war_end_timestamp=war_end,
+                preparation_start_timestamp=war_preparation_start,
                 attack_order=attack_order
             ).first()
 
