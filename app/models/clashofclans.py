@@ -50,6 +50,8 @@ class CocPlayerWarHistory(db.Model):
     # war_end_timestamp + attack_order will be unique
     id = db.Column(db.Integer, primary_key=True)
     war_end_timestamp = db.Column(db.DateTime(timezone=True), nullable=False)
+    preparation_start_timestamp = db.Column(db.DateTime(timezone=True), nullable=True)
+    start_timestamp = db.Column(db.DateTime(timezone=True), nullable=True)
     attack_order = db.Column(db.Integer, nullable=False)
     tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag'), nullable=False)
     attacker_townhall = db.Column(db.Integer, nullable=False)

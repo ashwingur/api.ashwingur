@@ -693,6 +693,8 @@ class ClashCommands(commands.Cog):
                                 continue
                         
                         end_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
+                        # start_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
+                        # preparation_start_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
                         
                         table_data.append([
                             end_date.strftime('%d-%m-%y'),

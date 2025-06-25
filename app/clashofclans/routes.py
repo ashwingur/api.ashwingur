@@ -453,8 +453,8 @@ def get_war_attack_history(clan_tag):
     
     query = CocPlayerWarHistory.query.join(CocPlayer).filter(
         CocPlayer.clan_tag == clan_tag,
-        CocPlayerWarHistory.war_end_timestamp >= start_date,
-        CocPlayerWarHistory.war_end_timestamp <= end_date
+        CocPlayerWarHistory.preparation_start_timestamp >= start_date,
+        CocPlayerWarHistory.preparation_start_timestamp <= end_date
     )
 
     # Filter by player tags or names
@@ -513,6 +513,8 @@ def update_war_history(tag):
         # No attacks to process
         return jsonify({"success": True})
     
+    war_preparation_start = datetime.strptime(data["preparationStartTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
+    war_start = datetime.strptime(data["startTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
     war_end = datetime.strptime(data["endTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
 
     for member in data["clan"]["members"]:
@@ -553,7 +555,9 @@ def update_war_history(tag):
                 duration=duration,
                 stars=stars,
                 attack_order=attack_order,
-                is_cwl=data["isCwl"]
+                is_cwl=data["isCwl"],
+                preparation_start_timestamp=war_preparation_start,
+                start_timestamp=war_start
             )
 
             try:
