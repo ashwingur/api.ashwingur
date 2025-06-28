@@ -746,7 +746,14 @@ class ClashCommands(commands.Cog):
                             cell.set_text_props(color=CELL_TEXT_COLOR) # Apply cell text color
                         cell.set_edgecolor('lightgray') # Cell borders
 
-                    plt.title(f'{player["name"]} {"CWL " if cwl_only else ""}War Attack Logs ({days}D)', fontsize=16, pad=2, color=HEADER_TEXT_COLOR) # Apply title text color
+                    plt.title(
+                        f'{player["name"]} {"CWL " if cwl_only else ""}War Attack Logs ({days}D)\n'
+                        f'All time war records: '
+                        f'{player["all_time_regular_wars"]} regular wars, {player["all_time_cwl_wars"]} CWL wars',
+                        fontsize=16,
+                        pad=2,
+                        color=HEADER_TEXT_COLOR
+                    )
                     fig.tight_layout(rect=[0, 0, 1, 1]) # Adjust layout to prevent title overlap
 
                     # Save the plot to a BytesIO object

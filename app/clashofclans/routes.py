@@ -482,14 +482,18 @@ def get_war_attack_history(clan_tag):
     for attack in war_history_records:
         player_tag = attack.tag
         player_name = attack.player.name
+        regular_war_count = attack.player.regular_wars
+        cwl_war_count = attack.player.cwl_wars
 
-        player_war_history[(player_tag, player_name)].append(schema.dump(attack))
+        player_war_history[(player_tag, player_name, regular_war_count, cwl_war_count)].append(schema.dump(attack))
     
     final_response = [{
         "tag": tag,
         "name": name,
+        "all_time_regular_wars": regular_wars,
+        "all_time_cwl_wars": cwl_wars,
         "attacks": attacks
-    } for (tag, name), attacks in player_war_history.items()]
+    } for (tag, name, regular_wars, cwl_wars), attacks in player_war_history.items()]
 
     return jsonify(final_response), 200
 
@@ -573,8 +577,6 @@ def update_war_history(tag):
                 preparation_start_timestamp=war_preparation_start,
                 start_timestamp=war_start
             )
-
-
 
             try:
                 db.session.add(new_entry)
