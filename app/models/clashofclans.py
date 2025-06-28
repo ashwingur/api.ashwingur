@@ -80,8 +80,8 @@ class CocPlayer(db.Model):
     activity_change_date = db.Column(db.DateTime(timezone=True), nullable=True)
     last_regular_war_date = db.Column(db.DateTime(timezone=True), nullable=True)
     last_cwl_war_date = db.Column(db.DateTime(timezone=True), nullable=True)
-    regular_wars = db.Column(db.Integer, nullable=True, default=0)
-    cwl_wars = db.Column(db.Integer, nullable=True, default=0)
+    regular_wars = db.Column(db.Integer, nullable=False, default=0)
+    cwl_wars = db.Column(db.Integer, nullable=False, default=0)
 
 
 class PlayerDataItemLevelSchema(Schema):
