@@ -144,6 +144,11 @@ def update_player_activity():
                     player.clan_tag = None
                     player.clan_name = None
                 player.name = player_response.json()["name"]
+
+                if not player.regular_wars:
+                    player.regular_wars = 0
+                if not player.cwl_wars:
+                    player.cwl_wars = 0
                     
 
                 data = player_response.json()
