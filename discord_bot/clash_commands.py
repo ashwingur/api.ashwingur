@@ -363,14 +363,15 @@ class ClashCommands(commands.Cog):
                     )
 
                     if should_send_prep or should_send_end:
-                        embed = await create_clan_war_embed(data, clan_war, max_attacks)
-                        await channel.send(embed=embed)
-
                         if should_send_prep:
+                            await channel.send("New war found!")
                             self.last_sent_war_prep_time = prep_time
 
                         if should_send_end:
+                            await channel.send("War reminder")
                             self.last_sent_war_end_time = end_time
+                        embed = await create_clan_war_embed(data, clan_war, max_attacks)
+                        await channel.send(embed=embed)
 
         except Exception as e:
             await channel.send(f"Error: {e}")
@@ -827,7 +828,8 @@ class ClashCommands(commands.Cog):
                         self.last_sent_capital_end_time = end_time
 
         except Exception as e:
-            await channel.send(f"Error: {e}")
+            pass
+            # await channel.send(f"Error: {e}")
     
     @tasks.loop(seconds=120) # Clan caching is 2min
     async def check_membership_change(self):
@@ -943,8 +945,9 @@ class ClashCommands(commands.Cog):
                     self.clan_members = current_member_list
 
         except Exception as e:
-            await channel.send(f"Error checking membership: {e}")
-            print(f"Error checking membership: {e}") # Log the error
+            # await channel.send(f"Error checking membership: {e}")
+            # print(f"Error checking membership: {e}") # Log the error
+            pass
 
     @tasks.loop(seconds=120) # Clan caching is 2min
     async def check_clan_properties_change(self):
@@ -1100,7 +1103,8 @@ class ClashCommands(commands.Cog):
                     self.clan_data = current_clan_data
 
         except Exception as e:
-            print(f"Error checking clan properties: {e}") # Log the error
+            # print(f"Error checking clan properties: {e}") # Log the error
+            pass
 
 
     @send_daily_war_status.before_loop

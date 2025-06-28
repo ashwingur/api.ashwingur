@@ -521,6 +521,21 @@ def update_war_history(tag):
         player_tag = member["tag"]
         town_hall = member["townhallLevel"]
         map_position = member["mapPosition"]
+        is_cwl=data["isCwl"]
+
+        # increment the war count of this player if not already done
+        player = db.session.query(CocPlayer).filter_by(tag=player_tag).first()
+        if player:
+            if is_cwl:
+                if not player.last_cwl_war_date or player.last_cwl_war_date < war_preparation_start:
+                    player.last_cwl_war_date = war_preparation_start
+                    player.cwl_wars = (player.cwl_wars or 0) + 1
+                    db.session.commit()
+            else:
+                if not player.last_regular_war_date or player.last_regular_war_date < war_preparation_start:
+                    player.last_regular_war_date = war_preparation_start
+                    player.regular_wars = (player.regular_wars or 0) + 1
+                    db.session.commit()
 
         for attack in member.get("attacks", []):
             attack_order = attack["order"]
@@ -533,7 +548,7 @@ def update_war_history(tag):
 
             if existing_entry:
                 continue
-
+            
             stars = attack["stars"]
             destruction_percentage = attack["destructionPercentage"]
             duration = attack["duration"]
@@ -555,23 +570,21 @@ def update_war_history(tag):
                 duration=duration,
                 stars=stars,
                 attack_order=attack_order,
-                is_cwl=data["isCwl"],
+                is_cwl=is_cwl,
                 preparation_start_timestamp=war_preparation_start,
                 start_timestamp=war_start
             )
+
+
 
             try:
                 db.session.add(new_entry)
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
+            
     
     return jsonify({"success": True})
-    
-
-
-    
-
 
 @bp.route('/clan/<string:tag>/warlog', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
