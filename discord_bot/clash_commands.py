@@ -536,6 +536,7 @@ class ClashCommands(commands.Cog):
 
                         # Handle division by zero if no attacks meet criteria
                         if num_attacks == 0:
+                            if cwl_only: continue
                             average_stars = 0
                             average_duration = 0
                             average_destruction = 0
@@ -693,12 +694,12 @@ class ClashCommands(commands.Cog):
                             if not attack.get("is_cwl", False):
                                 continue
                         
-                        end_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
-                        # start_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
+                        # end_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
+                        start_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
                         # preparation_start_date = parser.parse(attack["war_end_timestamp"]).astimezone(ZoneInfo('Australia/Sydney'))
                         
                         table_data.append([
-                            end_date.strftime('%d-%m-%y'),
+                            start_date.strftime('%d-%m-%y'),
                             attack["stars"],
                             attack["destruction_percentage"],
                             attack["duration"],
