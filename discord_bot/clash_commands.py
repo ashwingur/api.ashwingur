@@ -841,7 +841,7 @@ class ClashCommands(commands.Cog):
     @tasks.loop(seconds=120) # Clan caching is 2min
     async def check_membership_change(self):
         """
-        Monitors and notifies the following events: Player joins, player leaves, role changes
+        Monitors and notifies the following events: Player joins, player leaves, role changes, Town Hall upgrades.
         """
         guild_id = GUILD_ID
         channel_id = CHANNEL_GENERAL
@@ -874,8 +874,6 @@ class ClashCommands(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=COC_PROXY_HEADERS) as resp:
                     if resp.status != 200:
-                        # Log error or send a message to admin if API is not responding
-                        print(f"Error fetching clan data for membership: {resp.status}")
                         return
 
                     full_clan_data = await resp.json() # Fetch full data
@@ -923,10 +921,14 @@ class ClashCommands(commands.Cog):
                         embed.timestamp = datetime.now(timezone.utc)
                         await channel.send(embed=embed)
 
-                    # Handle role changes for common members
+                    # Handle role and Town Hall changes for common members
                     for tag in common_tags:
-                        old_role = previous_members_by_tag[tag]["role"]
-                        new_role = current_members_by_tag[tag]["role"]
+                        previous_member = previous_members_by_tag[tag]
+                        current_member = current_members_by_tag[tag]
+
+                        # Check for role changes
+                        old_role = previous_member["role"]
+                        new_role = current_member["role"]
                         
                         if old_role != new_role:
                             old_role_index = role_map[old_role]
@@ -935,26 +937,43 @@ class ClashCommands(commands.Cog):
                             if new_role_index > old_role_index:
                                 change_type = "Promotion"
                                 role_change = f"promoted to **{role_display_map[new_role]}**"
+                                color = discord.Color.orange()
                             elif new_role_index < old_role_index:
                                 change_type = "Demotion"
                                 role_change = f"demoted to **{role_display_map[new_role]}**"
+                                color = discord.Color.dark_red() # A darker red for demotion
                             else:
                                 continue # Should not happen if old_role != new_role, but as a safeguard
                             
-                            member = current_members_by_tag[tag]
                             embed = discord.Embed(
-                                title=f'{change_type} - {member["name"]}',
-                                color=discord.Color.orange(),
-                                description=f"[{member['name']}](https://www.ashwingur.com/ClashOfClans/player/{member['tag'].replace('#','')}) has been {role_change}"
+                                title=f'{change_type} - {current_member["name"]}',
+                                color=color,
+                                description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) has been {role_change}"
                             )
+                            embed.timestamp = datetime.now(timezone.utc)
                             await channel.send(embed=embed)
 
+                        # Check for Town Hall level changes
+                        old_th_level = previous_member["townHallLevel"]
+                        new_th_level = current_member["townHallLevel"]
+
+
+                        if new_th_level > old_th_level:
+                            th_emoji_id = f'<:TH{new_th_level}:{townhall_map.get(new_th_level, "unknown_emoji_id")}>'
+                            embed = discord.Embed(
+                                title=f"Townhall Upgrade {th_emoji_id}",
+                                color=discord.Color.blue(),
+                                description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) upgraded their Town Hall to **{new_th_level}**"
+                            )
+                            await channel.send(embed=embed)
                     self.clan_members = current_member_list
 
+        except aiohttp.ClientError as e:
+            print(f"HTTP error fetching clan data: {e}")
         except Exception as e:
-            # await channel.send(f"Error checking membership: {e}")
-            # print(f"Error checking membership: {e}") # Log the error
-            pass
+            print(f"An unexpected error occurred in check_membership_change: {e}", file=sys.stderr)
+    
+
 
     @tasks.loop(seconds=120) # Clan caching is 2min
     async def check_clan_properties_change(self):
