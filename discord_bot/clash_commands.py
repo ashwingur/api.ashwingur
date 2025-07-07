@@ -563,7 +563,7 @@ class ClashCommands(commands.Cog):
                         return
 
                     # --- SORTING BY AVERAGE STARS DESCENDING ---
-                    sorted_players = sorted(processed_players, key=lambda p: (-p["average_stars"], p["name"]))
+                    sorted_players = sorted(processed_players, key=lambda p: (-p["average_stars"], -p["num_attacks"], p["name"]))
 
                     # Prepare data for the table from the sorted list
                     table_data = []
