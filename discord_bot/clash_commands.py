@@ -54,6 +54,26 @@ townhall_map = {
     18: "1370746329260888114",
 }
 
+hero_map = {
+    "Barbarian King": "<:Barbarian_King:1393145179703083058>",
+    "Archer Queen": "<:Archer_Queen:1393145176746229850>",
+    "Minion Prince": "<:Minion_Prince:1393145181728936016>",
+    "Grand Warden": "<:Grand_Warden:1393145174388904048>",
+    "Royal Champion": "<:Royal_Champion:1393145172404994068>",
+    "Battle Machine": "<:Battle_Machine:1393155805682995301>",
+    "Battle Copter": "<:Battle_Copter:1393155803510345821>",
+}
+
+hero_order = {
+    "Barbarian King": 1,
+    "Archer Queen": 2,
+    "Minion Prince": 3,
+    "Grand Warden": 4,
+    "Royal Champion": 5,
+    "Battle Machine": 6,
+    "Battle Copter": 7,
+}
+
 def strip_accents(text):
     return ''.join(
         c for c in unicodedata.normalize('NFKD', text)
@@ -905,9 +925,31 @@ class ClashCommands(commands.Cog):
                         embed.add_field(name="Builder Trophies 🏆", value=str(joined_member["builderBaseTrophies"]))
                         embed.add_field(name=f'Town Hall <:TH{joined_member["townHallLevel"]}:{townhall_map.get(joined_member["townHallLevel"], "unknown_emoji_id")}>', value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
-                        embed.add_field(name="Clan Size", value=str(len(current_member_list)))
                         embed.timestamp = datetime.now(timezone.utc)
                         embed.set_thumbnail(url=joined_member.get("league", {}).get("iconUrls", {}).get("small"))
+
+                        # Hero levels - Not available in clan endpoint, need to query player
+                        try:
+                            encoded_player_tag = urllib.parse.quote(joined_member["tag"])
+                            player_url = f"{COC_PROXY_URL}/players/{encoded_player_tag}"
+                            async with session.get(player_url, headers=COC_PROXY_HEADERS) as player_resp:
+                                if player_resp.status == 200:
+                                    player_data = await player_resp.json()
+                                    heroes = sorted(player_data.get("heroes", []), key=lambda x: hero_order[x['name']])
+                                    hero_list = []
+                                    for hero in heroes:
+                                        hero_list.append(f'{hero_map[hero["name"]]}`{hero["level"]}`')
+                                    
+                                    if hero_list:
+                                        hero_string = " ".join(hero_list)
+                                    else:
+                                        hero_string = "No heroes"
+                                    
+                                    embed.add_field(name="Heroes", value=hero_string)
+                        except aiohttp.ClientError as e:
+                            pass
+
+                        embed.add_field(name="Clan Size", value=str(len(current_member_list)))
                         await channel.send(embed=embed)
 
                     # Handle left members
