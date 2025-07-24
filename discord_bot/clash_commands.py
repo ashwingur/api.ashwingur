@@ -101,7 +101,7 @@ async def get_current_clan_war(data: dict) -> Tuple[Optional[dict], int]:
 
     return None, 0
 
-async def create_clan_war_embed(data, clan_war, max_attacks: int):
+async def create_clan_war_embed(data, clan_war, max_attacks: int, session: aiohttp.ClientSession):
     embed = discord.Embed(
     title=f"War Info: {data.get('name', 'Unknown')}",
     description=f"Tag: [{data.get('tag')}](https://www.ashwingur.com/ClashOfClans/clan/{data.get('tag').replace('#','')})\n{clan_war['teamSize']} vs {clan_war['teamSize']}",
@@ -110,12 +110,29 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
 
     embed.set_thumbnail(url=data.get("badgeUrls").get("small"))
 
+
+
     if clan_war:
         clan1 = clan_war["clan"]
         clan2 = clan_war["opponent"]
         if clan2["tag"] == data["tag"]:
             clan1, clan2 = clan2, clan1
-        
+
+        # We also want to call the 2nd clan API to get war streak information
+        encoded_tag = urllib.parse.quote(clan2["tag"])
+        url = f"{COC_PROXY_URL}/clans/{encoded_tag}"
+        async with session.get(url, headers=COC_PROXY_HEADERS) as resp:
+            opponent_wins = "?"
+            opponent_losses = "?"
+            opponent_draws = "?"
+            opponent_streak = "?"
+            if resp.status == 200:
+                opponent_data = await resp.json()
+                opponent_wins = opponent_data.get("warWins")
+                opponent_losses = opponent_data.get("warLosses", "?")
+                opponent_draws = opponent_data.get("warTies", "?")
+                opponent_streak = opponent_data.get("warWinStreak")
+
         state = "N/A"
         if clan_war.get("state") == "preparation":
             state = "Preparation"
@@ -128,8 +145,26 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int):
         embed.add_field(name="War Status", value=state, inline=False)
         embed.add_field(name="Time Until War Ends", value=time_remaining, inline=False)
 
-        clan1_summary = f"⭐: {clan1['stars']}\n⚔️: {clan1['attacks']} / {clan_war['teamSize']*max_attacks}\n💥: {clan1['destructionPercentage']:.1f}%\n\n" if state == "In War" else ""
-        clan2_summary = f"⭐: {clan2['stars']}\n⚔️: {clan2['attacks']} / {clan_war['teamSize']*max_attacks}\n💥: {clan2['destructionPercentage']:.1f}%\n\n" if state == "In War" else ""
+        if state == "In War":
+            clan1_summary = f"""⭐: {clan1['stars']}\n⚔️: {clan1['attacks']} / {clan_war['teamSize'] * max_attacks}\n💥: {clan1['destructionPercentage']:.1f}%\n"""
+            
+            clan2_summary = f"""⭐: {clan2['stars']}\n⚔️: {clan2['attacks']} / {clan_war['teamSize'] * max_attacks}\n💥: {clan2['destructionPercentage']:.1f}%\n"""
+        else:
+            clan1_summary = ""
+            clan2_summary = ""
+
+        # We'll always put win streak data
+        clan1_summary += (
+            f"🔥 : {data['warWinStreak']} streak"
+            f"{' 😂' if data['warWinStreak'] <= 5 else ' 😮' if data['warWinStreak'] < 20 else ' 😱' if data['warWinStreak'] < 50 else ' 🐲'}\n"
+            f"W/L/D: {data['warWins']}/{data['warLosses']}/{data['warTies']}\n\n"
+        )
+
+        clan2_summary += (
+            f"🔥 : {opponent_streak} streak"
+            f"{' 😂' if opponent_streak <= 5 else ' 😮' if opponent_streak < 20 else ' 😱' if opponent_streak < 50 else ' 🐲'}\n"
+            f"W/L/D: {opponent_wins}/{opponent_losses}/{opponent_draws}\n\n"
+        )
 
         # Get a summary of townhall numbers in each clan
         clan1_townhalls = dict(sorted(Counter(member["townhallLevel"] for member in clan1["members"]).items(), reverse=True))
@@ -305,7 +340,7 @@ class ClashCommands(commands.Cog):
                     if not clan_war:
                         await interaction.followup.send("Clan is not in war or war log is private.")
                         return
-                    embed = await create_clan_war_embed(data, clan_war, max_attacks)
+                    embed = await create_clan_war_embed(data, clan_war, max_attacks, session)
 
                     await interaction.followup.send(embed=embed)
 
@@ -390,11 +425,11 @@ class ClashCommands(commands.Cog):
                         if should_send_end:
                             await channel.send("War reminder")
                             self.last_sent_war_end_time = end_time
-                        embed = await create_clan_war_embed(data, clan_war, max_attacks)
+                        embed = await create_clan_war_embed(data, clan_war, max_attacks, session)
                         await channel.send(embed=embed)
 
         except Exception as e:
-            await channel.send(f"Error: {e}")
+            print(f"Error: {e}", file=sys.stderr)
 
     @app_commands.command(name="activity", description="Check when TheOrganisation members were last active")
     @app_commands.describe(days="Days ago to filter by (default = 5)", name="Player name, overrides days filter (optional)")
@@ -1011,7 +1046,7 @@ class ClashCommands(commands.Cog):
                     self.clan_members = current_member_list
 
         except aiohttp.ClientError as e:
-            print(f"HTTP error fetching clan data: {e}")
+            print(f"HTTP error fetching clan data: {e}", file=sys.stderr)
         except Exception as e:
             print(f"An unexpected error occurred in check_membership_change: {e}", file=sys.stderr)
     
