@@ -31,6 +31,7 @@ CHANNEL_BOT = 1089437682679165028
 CHANNEL_WAR = 1081513755415949393
 CHANNEL_CLAN_CAPITAL = 1081513938606362704
 CHANNEL_GENERAL = 1081503290132545599
+CHANNEL_MEMBERSHIP = 1412617696742211604
 
 # Townhall emoji ids <TH{level}:id>
 townhall_map = {
@@ -109,8 +110,6 @@ async def create_clan_war_embed(data, clan_war, max_attacks: int, session: aioht
     )
 
     embed.set_thumbnail(url=data.get("badgeUrls").get("small"))
-
-
 
     if clan_war:
         clan1 = clan_war["clan"]
@@ -899,12 +898,12 @@ class ClashCommands(commands.Cog):
         Monitors and notifies the following events: Player joins, player leaves, role changes, Town Hall upgrades.
         """
         guild_id = GUILD_ID
-        channel_id = CHANNEL_GENERAL
         guild = self.bot.get_guild(guild_id)
         if not guild:
             return
-        channel = guild.get_channel(channel_id)
-        if not channel:
+        channel_general = guild.get_channel(CHANNEL_GENERAL)
+        channel_membership = guild.get_channel(CHANNEL_MEMBERSHIP)
+        if not channel_general and not channel_membership:
             return
 
         encoded_tag = urllib.parse.quote(DEFAULT_CLAN_TAG)
@@ -985,7 +984,7 @@ class ClashCommands(commands.Cog):
                             pass
 
                         embed.add_field(name="Clan Size", value=str(len(current_member_list)))
-                        await channel.send(embed=embed)
+                        await channel_membership.send(embed=embed)
 
                     # Handle left members
                     for tag in left_tags:
@@ -996,7 +995,7 @@ class ClashCommands(commands.Cog):
                             description=f"[{left_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{left_member['tag'].replace('#','')}) left/kicked from [TheOrganisation](https://www.ashwingur.com/ClashOfClans/clan/220QP2GGU)")
                         embed.add_field(name="Clan Size", value=str(len(current_member_list)))
                         embed.timestamp = datetime.now(timezone.utc)
-                        await channel.send(embed=embed)
+                        await channel_membership.send(embed=embed)
 
                     # Handle role and Town Hall changes for common members
                     for tag in common_tags:
@@ -1028,7 +1027,7 @@ class ClashCommands(commands.Cog):
                                 description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) has been {role_change}"
                             )
                             embed.timestamp = datetime.now(timezone.utc)
-                            await channel.send(embed=embed)
+                            await channel_general.send(embed=embed)
 
                         # Check for Town Hall level changes
                         old_th_level = previous_member["townHallLevel"]
@@ -1042,7 +1041,7 @@ class ClashCommands(commands.Cog):
                                 color=discord.Color.blue(),
                                 description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) upgraded their Town Hall to **{new_th_level}**"
                             )
-                            await channel.send(embed=embed)
+                            await channel_general.send(embed=embed)
                     self.clan_members = current_member_list
 
         except aiohttp.ClientError as e:
