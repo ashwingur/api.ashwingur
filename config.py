@@ -17,4 +17,5 @@ class Config:
     PARKING_POST_PASSWORD = os.environ.get("PARKING_POST_PASSWORD")
     WEATHER_POST_PASSWORD = os.environ.get("WEATHER_POST_PASSWORD")
     COC_BEARER_TOKEN = os.environ.get("COC_BEARER_TOKEN")
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 

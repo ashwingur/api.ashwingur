@@ -16,3 +16,4 @@ Flask-Migrate
 python-dotenv
 marshmallow
 marshmallow-sqlalchemy
+openai

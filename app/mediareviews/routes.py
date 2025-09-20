@@ -11,10 +11,11 @@ from app.mediareviews import bp
 from flask import current_app, jsonify, request
 from app.models.media_reviews import Genre, MediaReview, SubMediaReview, sub_media_review_schema, media_reviews_list_schema, media_review_schema, genre_list_schema
 from app.extensions import db, roles_required, limiter
-from dateutil import parser
-from zoneinfo import ZoneInfo
 from sqlalchemy.exc import IntegrityError
+import openai
+from config import Config
 
+client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
 
 @bp.route('', methods=['GET'])
 @limiter.limit('40/minute', override_defaults=True)
@@ -447,3 +448,46 @@ def download_all_images():
         executor.map(partial(download, app=app), sub_media_reviews)
 
     return jsonify({"success": True}), 200
+
+@bp.route('/chat', methods=['POST'])
+@limiter.limit('5/minute; 100/day', override_defaults=True)
+def chat_about_review():
+    """
+    Chat endpoint: given a media title, returns a chatbot-style reply
+    based on your stored review.
+    """
+    data = request.get_json()
+    user_query = data.get("query")
+    if not user_query:
+        return {"error": "Missing 'query' in request body"}, 400
+
+    # Look for a review that matches (case-insensitive search on name)
+    review: MediaReview = MediaReview.query.filter(
+        MediaReview.name.ilike(f"%{user_query}%")
+    ).first()
+
+    if not review:
+        return {
+            "reply": f"I haven't reviewed '{user_query}' yet."
+        }, 200
+    
+    instructions = "You are an assistant for Ashwin's Media review site. Answer questions based only on Ashwin's reviews. If you don't have enough data, say there is no information."
+
+    # If you want to make it conversational with an LLM:
+    prompt = f"""
+    The user is asking about: {user_query}.
+    
+    Here is Ashwin's review:
+    {review.review_content}
+    """
+
+    try:
+        response = client.responses.create(
+            model="gpt-5-nano",
+            reasoning={"effort": "low"},
+            instructions=instructions,
+            input=prompt,
+        )
+        return {"reply": response.output_text}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
