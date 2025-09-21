@@ -328,7 +328,7 @@ class MediaReviewSchema(SQLAlchemyAutoSchema):
         return None
 
     @validates("cover_image_bg_colour")
-    def validate_cover_image_bg_colour(self, value):
+    def validate_cover_image_bg_colour(self, value, **kwargs):
         if not value:
             return
         hex_color_regex = r'^#[A-Fa-f0-9]{6}$'

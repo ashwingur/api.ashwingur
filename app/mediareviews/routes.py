@@ -461,15 +461,32 @@ def chat_about_review():
     if not user_query:
         return {"error": "Missing 'query' in request body"}, 400
 
-    # Look for a review that matches (case-insensitive search on name)
-    review: MediaReview = MediaReview.query.filter(
-        MediaReview.name.ilike(f"%{user_query}%")
-    ).first()
 
-    if not review:
+    # Split query into words
+    query_words = [w.strip().lower() for w in user_query.split() if w.strip()]
+
+    # Load all reviews (you can optimise later with SQL filtering if needed)
+    reviews: List[MediaReview] = MediaReview.query.all()
+
+    best_match = None
+    best_score = 0
+
+    for review in reviews:
+        # Split name into words
+        name_words = [w.strip().lower() for w in review.name.split() if w.strip()]
+        # Count how many words overlap
+        overlap = len(set(query_words) & set(name_words))
+
+        if overlap > best_score:
+            best_score = overlap
+            best_match = review
+
+    if not best_match or best_score == 0:
         return {
             "reply": f"I haven't reviewed '{user_query}' yet."
         }, 200
+    
+    print(best_match.name, file=sys.stderr)
     
     instructions = "You are an assistant for Ashwin's Media review site. Answer questions based only on Ashwin's reviews. If you don't have enough data, say there is no information."
 
@@ -478,7 +495,7 @@ def chat_about_review():
     The user is asking about: {user_query}.
     
     Here is Ashwin's review:
-    {review.review_content}
+    {best_match.review_content}
     """
 
     try:
