@@ -474,10 +474,8 @@ def chat_about_review():
         # Filter out stopwords and empties
         return cleaned if cleaned and cleaned not in STOPWORDS else ""
 
-
     # Split query into words, remove punctuation and stop words
     query_words = [nw for w in user_query.split() if (nw := normalize_word(w))]
-
 
     db_query = MediaReview.query
     db_query = db_query.outerjoin(SubMediaReview, MediaReview.sub_media_reviews)
@@ -487,7 +485,6 @@ def chat_about_review():
         # Calculate the overlap between the query words and review name words
         score = 0
         name_words = [normalize_word(w) for w in review.name.split() if w.strip()]
-        print(set(query_words), set(name_words), file=sys.stderr)
         score += len(set(query_words) & set(name_words))
         subreviews: List[SubMediaReview] = review.sub_media_reviews
         sub_score = 0
@@ -497,17 +494,15 @@ def chat_about_review():
         score += sub_score
         if score > 0:
             matches[review] = score
-        print(score, file=sys.stderr)
-    # print(matches, file=sys.stderr)
-    # for key, val in matches.items():
-    #     print(key.name, val, file=sys.stderr)
     matches: List[Tuple[MediaReview, int]] = sorted(matches.items(), key=lambda x: x[1], reverse=True)[:5]
 
     instructions = ("You are an assistant for Ashwin's Media review site."
-                    "Answer questions based only on Ashwin's reviews."
+                    "Answer questions based only on Ashwin's reviews"
                     "Only use the information provided, if it's not available then say you couldn't find it."
+                    "You can also bring up all sub-reviews of a main review."
                     "The user should enter specific titles."
-                    "Summarise information in a paragraph, or dot points if it's longer.")
+                    "Remove all html"
+                    "Format your response using Markdown, use bold for sections and ### for headings, don't overuse dotpoints.")
 
     prompt = f"""
     The user is asking about: "{user_query}".
@@ -515,8 +510,13 @@ def chat_about_review():
     Here are Ashwin's reviews:
     """
 
+    if len(matches) == 0:
+        prompt += "No matches in the database found."
+
+    review_names = []
+
     for review, _ in matches:
-        print(review.name, _, file=sys.stderr)
+        review_names.append(review.name)
         prompt += f"Name: {review.name},"
         prompt += f"Rating: {review.rating},"
         prompt += f"Medium: {review.media_type}"
@@ -524,9 +524,16 @@ def chat_about_review():
         prompt += f"Cons: {review.cons},"
         prompt += f"Review: {review.review_content},"
         prompt += f"Date Consumed: {review.consumed_date},"
-    
-    print(prompt, file=sys.stderr)
-
+        prompt += f"Creator: {review.creator},"
+        subreviews: List[SubMediaReview] = review.sub_media_reviews
+        for subreview in subreviews:
+            prompt += f"Subreview: {subreview.name}"
+            prompt += f"Rating: {subreview.rating},"
+            prompt += f"Pros: {subreview.pros},"
+            prompt += f"Cons: {subreview.cons},"
+            prompt += f"Review: {subreview.review_content},"
+            prompt += f"Date Consumed: {subreview.consumed_date},"
+        prompt += "\n"
 
     try:
         response = client.responses.create(
@@ -535,6 +542,6 @@ def chat_about_review():
             instructions=instructions,
             input=prompt,
         )
-        return {"reply": response.output_text}, 200
+        return {"reply": response.output_text, "review_names": review_names}, 200
     except Exception as e:
         return {"error": str(e)}, 500
