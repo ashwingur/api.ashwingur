@@ -1,8 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
+import re
 import sys
-from typing import List
+from typing import Dict, List, Tuple
 from flask_login import login_required
 from marshmallow import ValidationError
 from sqlalchemy import func, or_, select
@@ -452,6 +453,7 @@ def download_all_images():
 @bp.route('/chat', methods=['POST'])
 @limiter.limit('5/minute; 100/day', override_defaults=True)
 def chat_about_review():
+    MAX_QUERY_LENGTH = 200
     """
     Chat endpoint: given a media title, returns a chatbot-style reply
     based on your stored review.
@@ -460,43 +462,71 @@ def chat_about_review():
     user_query = data.get("query")
     if not user_query:
         return {"error": "Missing 'query' in request body"}, 400
+    user_query = user_query[:MAX_QUERY_LENGTH]
+
+    STOPWORDS = {
+    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"
+    }
+
+    def normalize_word(word: str) -> str:
+        # Remove punctuation, lowercase, and strip
+        cleaned = re.sub(r"[^\w]", "", word.lower()).strip()
+        # Filter out stopwords and empties
+        return cleaned if cleaned and cleaned not in STOPWORDS else ""
 
 
-    # Split query into words
-    query_words = [w.strip().lower() for w in user_query.split() if w.strip()]
+    # Split query into words, remove punctuation and stop words
+    query_words = [nw for w in user_query.split() if (nw := normalize_word(w))]
 
-    # Load all reviews (you can optimise later with SQL filtering if needed)
-    reviews: List[MediaReview] = MediaReview.query.all()
 
-    best_match = None
-    best_score = 0
-
+    db_query = MediaReview.query
+    db_query = db_query.outerjoin(SubMediaReview, MediaReview.sub_media_reviews)
+    reviews: List[MediaReview] = db_query.all()
+    matches: Dict[MediaReview, int] = {} # score: match
     for review in reviews:
-        # Split name into words
-        name_words = [w.strip().lower() for w in review.name.split() if w.strip()]
-        # Count how many words overlap
-        overlap = len(set(query_words) & set(name_words))
+        # Calculate the overlap between the query words and review name words
+        score = 0
+        name_words = [normalize_word(w) for w in review.name.split() if w.strip()]
+        print(set(query_words), set(name_words), file=sys.stderr)
+        score += len(set(query_words) & set(name_words))
+        subreviews: List[SubMediaReview] = review.sub_media_reviews
+        sub_score = 0
+        for subreview in subreviews:
+            name_words = [normalize_word(w) for w in subreview.name.split() if w.strip()]
+            sub_score = max(sub_score, len(set(query_words) & set(name_words)))
+        score += sub_score
+        if score > 0:
+            matches[review] = score
+        print(score, file=sys.stderr)
+    # print(matches, file=sys.stderr)
+    # for key, val in matches.items():
+    #     print(key.name, val, file=sys.stderr)
+    matches: List[Tuple[MediaReview, int]] = sorted(matches.items(), key=lambda x: x[1], reverse=True)[:5]
 
-        if overlap > best_score:
-            best_score = overlap
-            best_match = review
+    instructions = ("You are an assistant for Ashwin's Media review site."
+                    "Answer questions based only on Ashwin's reviews."
+                    "Only use the information provided, if it's not available then say you couldn't find it."
+                    "The user should enter specific titles."
+                    "Summarise information in a paragraph, or dot points if it's longer.")
 
-    if not best_match or best_score == 0:
-        return {
-            "reply": f"I haven't reviewed '{user_query}' yet."
-        }, 200
-    
-    print(best_match.name, file=sys.stderr)
-    
-    instructions = "You are an assistant for Ashwin's Media review site. Answer questions based only on Ashwin's reviews. If you don't have enough data, say there is no information."
-
-    # If you want to make it conversational with an LLM:
     prompt = f"""
-    The user is asking about: {user_query}.
+    The user is asking about: "{user_query}".
     
-    Here is Ashwin's review:
-    {best_match.review_content}
+    Here are Ashwin's reviews:
     """
+
+    for review, _ in matches:
+        print(review.name, _, file=sys.stderr)
+        prompt += f"Name: {review.name},"
+        prompt += f"Rating: {review.rating},"
+        prompt += f"Medium: {review.media_type}"
+        prompt += f"Pros: {review.pros},"
+        prompt += f"Cons: {review.cons},"
+        prompt += f"Review: {review.review_content},"
+        prompt += f"Date Consumed: {review.consumed_date},"
+    
+    print(prompt, file=sys.stderr)
+
 
     try:
         response = client.responses.create(
