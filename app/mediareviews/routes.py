@@ -464,7 +464,7 @@ def extract_reviews_from_user_query(user_query: str, reviews: List[MediaReview])
 You are an assistant that extracts which reviews from the provided database are relevant to the user's query.
 - Identify which review names or subreview names from the database are relevant to the user query.
 - Match exactly on "Review Name" or subreview name from the database (no made-up names).
-- You may use creator, medium, date, or genres as hints.
+- You may use creator, medium, date, genres or your general knowledge as hints.
 - If nothing matches, return an empty list.
 
 OUTPUT FORMAT:
@@ -512,7 +512,7 @@ def chat_about_review():
     instructions = f"""
 You are an assistant for Ashwin's Media Review site.
 
-- Only answer questions using the information provided from Ashwin's reviews.  
+- Only answer questions using the information provided from Ashwin's reviews, but you can be flexible when matching the user query.  
 - If the answer is not available, clearly say that you could not find it.  
 - Reviews may contain sub-reviews; if the user asks about a main review, also include its sub-reviews when relevant.  
 - Remove all HTML from responses.  
