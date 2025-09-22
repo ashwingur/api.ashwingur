@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
+import json
 import re
 import sys
 from typing import Dict, List, Tuple
@@ -450,10 +451,49 @@ def download_all_images():
 
     return jsonify({"success": True}), 200
 
+def extract_reviews_from_user_query(user_query: str, reviews: List[MediaReview]) -> List[str]:
+    reviews_summary = "Review Name,Rating,Creator,Medium,Date Consumed,Genres,Subreview Names\n"
+    rows = []
+    for review in reviews:
+        genre_names = "; ".join([g.name for g in review.genres]) if review.genres else ""
+        subnames = "; ".join([s.name for s in review.sub_media_reviews])
+        row = f'"{review.name}","{review.rating}""{review.creator}","{review.media_type}","{review.consumed_date}","{genre_names}","{subnames}"'
+        rows.append(row)
+    reviews_summary += "\n".join(rows)
+    instructions = """
+You are an assistant that extracts which reviews from the provided database are relevant to the user's query.
+- Identify which review names or subreview names from the database are relevant to the user query.
+- Match exactly on "Review Name" or subreview name from the database (no made-up names).
+- You may use creator, medium, date, or genres as hints.
+- If nothing matches, return an empty list.
+
+OUTPUT FORMAT:
+Return a JSON array of strings with the exact matching review names. Example:
+["Dune", "Children of Dune"]
+"""
+    prompt = f"""
+USER QUERY:
+{user_query}
+
+REVIEWS DATABASE (CSV):
+{reviews_summary}
+"""
+    try:
+        response = client.responses.create(
+            model="gpt-5-nano",
+            reasoning={"effort": "low"},
+            instructions=instructions,
+            input=prompt,
+        )
+        return json.loads(response.output_text)
+    except Exception as e:
+        return []
+
 @bp.route('/chat', methods=['POST'])
 @limiter.limit('5/minute; 100/day', override_defaults=True)
 def chat_about_review():
     MAX_QUERY_LENGTH = 200
+    MAX_MATCHES_FOR_PROMPT = 15
     """
     Chat endpoint: given a media title, returns a chatbot-style reply
     based on your stored review.
@@ -464,45 +504,24 @@ def chat_about_review():
         return {"error": "Missing 'query' in request body"}, 400
     user_query = user_query[:MAX_QUERY_LENGTH]
 
-    STOPWORDS = {
-    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"
-    }
-
-    def normalize_word(word: str) -> str:
-        # Remove punctuation, lowercase, and strip
-        cleaned = re.sub(r"[^\w]", "", word.lower()).strip()
-        # Filter out stopwords and empties
-        return cleaned if cleaned and cleaned not in STOPWORDS else ""
-
-    # Split query into words, remove punctuation and stop words
-    query_words = [nw for w in user_query.split() if (nw := normalize_word(w))]
-
     db_query = MediaReview.query
     db_query = db_query.outerjoin(SubMediaReview, MediaReview.sub_media_reviews)
     reviews: List[MediaReview] = db_query.all()
-    matches: Dict[MediaReview, int] = {} # score: match
-    for review in reviews:
-        # Calculate the overlap between the query words and review name words
-        score = 0
-        name_words = [normalize_word(w) for w in review.name.split() if w.strip()]
-        score += len(set(query_words) & set(name_words))
-        subreviews: List[SubMediaReview] = review.sub_media_reviews
-        sub_score = 0
-        for subreview in subreviews:
-            name_words = [normalize_word(w) for w in subreview.name.split() if w.strip()]
-            sub_score = max(sub_score, len(set(query_words) & set(name_words)))
-        score += sub_score
-        if score > 0:
-            matches[review] = score
-    matches: List[Tuple[MediaReview, int]] = sorted(matches.items(), key=lambda x: x[1], reverse=True)[:5]
+    name_matches = extract_reviews_from_user_query(user_query, reviews)
 
-    instructions = ("You are an assistant for Ashwin's Media review site."
-                    "Answer questions based only on Ashwin's reviews"
-                    "Only use the information provided, if it's not available then say you couldn't find it."
-                    "You can also bring up all sub-reviews of a main review."
-                    "The user should enter specific titles."
-                    "Remove all html"
-                    "Format your response using Markdown, use bold for sections and ### for headings, don't overuse dotpoints.")
+    instructions = f"""
+You are an assistant for Ashwin's Media Review site.
+
+- Only answer questions using the information provided from Ashwin's reviews.  
+- If the answer is not available, clearly say that you could not find it.  
+- Reviews may contain sub-reviews; if the user asks about a main review, also include its sub-reviews when relevant.  
+- Remove all HTML from responses.  
+- Use Markdown for formatting:  
+  - Use `###` for section headings.  
+  - Use **bold** for emphasis.  
+  - Use paragraphs for explanations and dotpoints only when listing items.  
+- If the number of results is large (e.g., more than 10 items), suggest the user view the full list on the provided link instead of listing everything.  
+    """
 
     prompt = f"""
     The user is asking about: "{user_query}".
@@ -510,13 +529,12 @@ def chat_about_review():
     Here are Ashwin's reviews:
     """
 
-    if len(matches) == 0:
-        prompt += "No matches in the database found."
+    if len(name_matches) == 0:
+        prompt += "No relevant reviews written by Ashwin."
 
-    review_names = []
-
-    for review, _ in matches:
-        review_names.append(review.name)
+    for review in reviews:
+        if review.name not in name_matches[:MAX_MATCHES_FOR_PROMPT]:
+            continue
         prompt += f"Name: {review.name},"
         prompt += f"Rating: {review.rating},"
         prompt += f"Medium: {review.media_type}"
@@ -542,6 +560,6 @@ def chat_about_review():
             instructions=instructions,
             input=prompt,
         )
-        return {"reply": response.output_text, "review_names": review_names}, 200
+        return {"reply": response.output_text, "review_names": name_matches}, 200
     except Exception as e:
         return {"error": str(e)}, 500
