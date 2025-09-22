@@ -465,6 +465,7 @@ You are an assistant that extracts which reviews from the provided database are 
 - Identify which review names or subreview names from the database are relevant to the user query.
 - Match exactly on "Review Name" or subreview name from the database (no made-up names).
 - You may use creator, medium, date, genres or your general knowledge as hints.
+- You may also sort the list as needed.
 - If nothing matches, return an empty list.
 
 OUTPUT FORMAT:
