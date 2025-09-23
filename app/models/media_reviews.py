@@ -271,8 +271,8 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
                                              h=320, enlarge=True, quality=60, cachebuster=obj.review_last_update_date)
         return None
 
-    @validates("cover_image_bg_colour", **kwargs)
-    def validate_cover_image_bg_colour(self, value):
+    @validates("cover_image_bg_colour")
+    def validate_cover_image_bg_colour(self, value, **kwargs):
         if not value:
             return
         hex_color_regex = r'^#[A-Fa-f0-9]{6}$'
