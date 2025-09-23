@@ -271,7 +271,7 @@ class SubMediaReviewSchema(SQLAlchemyAutoSchema):
                                              h=320, enlarge=True, quality=60, cachebuster=obj.review_last_update_date)
         return None
 
-    @validates("cover_image_bg_colour")
+    @validates("cover_image_bg_colour", **kwargs)
     def validate_cover_image_bg_colour(self, value):
         if not value:
             return
