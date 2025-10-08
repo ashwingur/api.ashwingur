@@ -960,7 +960,7 @@ class ClashCommands(commands.Cog):
                         embed.add_field(name=f'Town Hall <:TH{joined_member["townHallLevel"]}:{townhall_map.get(joined_member["townHallLevel"], "unknown_emoji_id")}>', value=str(joined_member["townHallLevel"]))
                         embed.add_field(name="Exp Level", value=str(joined_member["expLevel"]))
                         embed.timestamp = datetime.now(timezone.utc)
-                        embed.set_thumbnail(url=joined_member.get("league", {}).get("iconUrls", {}).get("small"))
+                        embed.set_thumbnail(url=joined_member.get("leagueTier", {}).get("iconUrls", {}).get("small"))
 
                         # Hero levels - Not available in clan endpoint, need to query player
                         try:
