@@ -12,13 +12,14 @@ CHANNEL_ID = 643314810640924675
 class TornCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.shoplifting_status_update.start()
+        # self.shoplifting_status_update.start()
         # Flag to track if the "both true" message for Jewelry Store has been sent in the current cycle
         self.jewelry_store_both_true_notified = False
 
     def cog_unload(self):
         self.shoplifting_status_update.cancel()
 
+    # NO LONGER NEEDED, DISABLE
     @tasks.loop(seconds=60)
     async def shoplifting_status_update(self):
         """

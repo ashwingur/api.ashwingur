@@ -933,11 +933,25 @@ class ClashCommands(commands.Cog):
                     full_clan_data = await resp.json() # Fetch full data
                     current_member_list = full_clan_data.get("memberList")
 
+                    # Fetch detailed player data for hero related stuff
+                    for member in current_member_list:
+                        try:
+                            encoded_player_tag = urllib.parse.quote(member["tag"])
+                            player_url = f"{COC_PROXY_URL}/players/{encoded_player_tag}"
+
+                            async with session.get(player_url, headers=COC_PROXY_HEADERS) as player_resp:
+                                if player_resp.status == 200:
+                                    player_data = await player_resp.json()
+                                    member["heroes"] = player_data["heroes"]
+
+
+                        except aiohttp.ClientError:
+                            pass
+
                     # We don't have previous state when starting up the bot so skip the first call
                     if not self.clan_members:
                         self.clan_members = current_member_list
                         return
-
                     previous_tags = {member["tag"] for member in self.clan_members}
                     current_tags = {member["tag"] for member in current_member_list}
 
@@ -962,26 +976,20 @@ class ClashCommands(commands.Cog):
                         embed.timestamp = datetime.now(timezone.utc)
                         embed.set_thumbnail(url=joined_member.get("leagueTier", {}).get("iconUrls", {}).get("small"))
 
-                        # Hero levels - Not available in clan endpoint, need to query player
-                        try:
-                            encoded_player_tag = urllib.parse.quote(joined_member["tag"])
-                            player_url = f"{COC_PROXY_URL}/players/{encoded_player_tag}"
-                            async with session.get(player_url, headers=COC_PROXY_HEADERS) as player_resp:
-                                if player_resp.status == 200:
-                                    player_data = await player_resp.json()
-                                    heroes = sorted(player_data.get("heroes", []), key=lambda x: hero_order[x['name']])
-                                    hero_list = []
-                                    for hero in heroes:
-                                        hero_list.append(f'{hero_map[hero["name"]]}`{hero["level"]}`')
-                                    
-                                    if hero_list:
-                                        hero_string = " ".join(hero_list)
-                                    else:
-                                        hero_string = "No heroes"
-                                    
-                                    embed.add_field(name="Heroes", value=hero_string)
-                        except aiohttp.ClientError as e:
-                            pass
+                        # Hero levels of joining player
+                        player_data = await player_resp.json()
+                        heroes = sorted(joined_member.get("heroes", []), key=lambda x: hero_order[x['name']])
+                        hero_list = []
+                        for hero in heroes:
+                            hero_list.append(f'{hero_map[hero["name"]]}`{hero["level"]}`')
+                        
+                        if hero_list:
+                            hero_string = " ".join(hero_list)
+                        else:
+                            hero_string = "No heroes"
+                        
+                        embed.add_field(name="Heroes", value=hero_string)
+
 
                         embed.add_field(name="Clan Size", value=str(len(current_member_list)))
                         await channel_membership.send(embed=embed)
@@ -1042,6 +1050,33 @@ class ClashCommands(commands.Cog):
                                 description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) upgraded their Town Hall to **{new_th_level}**"
                             )
                             await channel_general.send(embed=embed)
+                        
+                        # Notify when a hero has been maxed
+                        current_heroes = current_member.get("heroes")
+                        prev_heroes = previous_member.get("heroes")
+
+                        for hero in current_heroes:
+                            prev_hero = next((h for h in prev_heroes if h["name"] == hero["name"]), None)
+                            hero_display = hero_map.get(hero["name"], hero["name"])
+                            if not prev_hero:
+                                # New hero
+                                embed = discord.Embed(
+                                        title=f"Hero Unlocked",
+                                        color=discord.Color.gold(),
+                                        description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) has unlocked the **{hero['name']}**! {hero_display}"
+                                    )
+                                embed.timestamp = datetime.now(timezone.utc)
+                                await channel_general.send(embed=embed)
+                            if prev_hero["level"] < prev_hero["maxLevel"] and hero["level"] == hero["maxLevel"]:
+                                embed = discord.Embed(
+                                    title=f"Hero Maxed Out",
+                                    color=discord.Color.gold(),
+                                    description=f"[{current_member['name']}](https://www.ashwingur.com/ClashOfClans/player/{current_member['tag'].replace('#','')}) has maxed their **{hero['name']}**! {hero_display}"
+                                )
+                                embed.add_field(name="Level", value=f"{hero['level']}/{hero['maxLevel']}")
+                                embed.timestamp = datetime.now(timezone.utc)
+                                await channel_general.send(embed=embed)
+
                     self.clan_members = current_member_list
 
         except aiohttp.ClientError as e:
