@@ -903,6 +903,7 @@ class ClashCommands(commands.Cog):
             return
         channel_general = guild.get_channel(CHANNEL_GENERAL)
         channel_membership = guild.get_channel(CHANNEL_MEMBERSHIP)
+        channel_bot = guild.get_channel(CHANNEL_BOT)
         if not channel_general and not channel_membership:
             return
 
@@ -943,7 +944,6 @@ class ClashCommands(commands.Cog):
                                 if player_resp.status == 200:
                                     player_data = await player_resp.json()
                                     member["heroes"] = player_data["heroes"]
-
 
                         except aiohttp.ClientError:
                             pass
@@ -1067,7 +1067,7 @@ class ClashCommands(commands.Cog):
                                     )
                                 embed.timestamp = datetime.now(timezone.utc)
                                 await channel_general.send(embed=embed)
-                            if prev_hero["level"] < prev_hero["maxLevel"] and hero["level"] == hero["maxLevel"]:
+                            elif prev_hero["level"] < prev_hero["maxLevel"] and hero["level"] == hero["maxLevel"]:
                                 embed = discord.Embed(
                                     title=f"Hero Maxed Out",
                                     color=discord.Color.gold(),
