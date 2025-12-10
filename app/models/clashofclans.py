@@ -12,7 +12,7 @@ class CocPlayerData(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime(timezone=True), nullable=False, default=datetime.now(tz=ZoneInfo("UTC")))
-    tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag'), nullable=False)
+    tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag', ondelete="CASCADE"), nullable=False)
     town_hall_level = db.Column(db.Integer, nullable=False)
     town_hall_weapon_level = db.Column(db.Integer, nullable=True)
     exp_level = db.Column(db.Integer, nullable=False)
@@ -42,7 +42,7 @@ class CocPlayerData(db.Model):
     achievements = db.Column(JSONB, nullable=False)
 
     # Relationship to CocPlayer
-    player = db.relationship('CocPlayer', backref=db.backref('historical_data', lazy=True))
+    player = db.relationship('CocPlayer', back_populates='historical_data')
 
 class CocPlayerWarHistory(db.Model):
     __tablename__ = 'coc_player_war_history'
@@ -53,7 +53,7 @@ class CocPlayerWarHistory(db.Model):
     preparation_start_timestamp = db.Column(db.DateTime(timezone=True), nullable=False)
     start_timestamp = db.Column(db.DateTime(timezone=True), nullable=False)
     attack_order = db.Column(db.Integer, nullable=False)
-    tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag'), nullable=False)
+    tag = db.Column(db.String(15), db.ForeignKey('coc_player.tag', ondelete="CASCADE"), nullable=False)
     attacker_townhall = db.Column(db.Integer, nullable=False)
     map_position = db.Column(db.Integer, nullable=False)
     defender_townhall = db.Column(db.Integer, nullable=False)
@@ -65,7 +65,7 @@ class CocPlayerWarHistory(db.Model):
     is_cwl = db.Column(db.Boolean, nullable=False, default=False)
 
     # Relationship to CocPlayer
-    player = db.relationship('CocPlayer', backref=db.backref('war_history', lazy=True))
+    player = db.relationship('CocPlayer', back_populates='war_history')
 
 class CocPlayer(db.Model):
     __tablename__ = 'coc_player'
@@ -82,6 +82,20 @@ class CocPlayer(db.Model):
     last_cwl_war_date = db.Column(db.DateTime(timezone=True), nullable=True)
     regular_wars = db.Column(db.Integer, nullable=False, default=0)
     cwl_wars = db.Column(db.Integer, nullable=False, default=0)
+
+    historical_data = db.relationship(
+        "CocPlayerData",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="player"
+    )
+
+    war_history = db.relationship(
+        "CocPlayerWarHistory",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="player"
+    )
 
 
 class PlayerDataItemLevelSchema(Schema):
