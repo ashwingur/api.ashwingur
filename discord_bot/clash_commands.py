@@ -61,6 +61,7 @@ hero_map = {
     "Minion Prince": "<:Minion_Prince:1393145181728936016>",
     "Grand Warden": "<:Grand_Warden:1393145174388904048>",
     "Royal Champion": "<:Royal_Champion:1393145172404994068>",
+    "Dragon Duke": "<:Dragon_Duke:1480041568537804902>",
     "Battle Machine": "<:Battle_Machine:1393155805682995301>",
     "Battle Copter": "<:Battle_Copter:1393155803510345821>",
 }
@@ -71,8 +72,9 @@ hero_order = {
     "Minion Prince": 3,
     "Grand Warden": 4,
     "Royal Champion": 5,
-    "Battle Machine": 6,
-    "Battle Copter": 7,
+    "Dragon Duke": 6,
+    "Battle Machine": 7,
+    "Battle Copter": 8,
 }
 
 def strip_accents(text):
