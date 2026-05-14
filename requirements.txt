@@ -6,8 +6,8 @@ Flask-SQLAlchemy
 Flask-SocketIO
 psycopg2-binary
 redis
-gunicorn
-eventlet
+gunicorn==21.2.0
+eventlet==0.36.1
 pillow
 werkzeug
 python-dateutil
