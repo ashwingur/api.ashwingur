@@ -3,20 +3,15 @@ import concurrent.futures
 from datetime import datetime, timedelta
 import sys
 from zoneinfo import ZoneInfo
-import concurrent
 from flask import jsonify, request, current_app
-import requests
 from sqlalchemy import and_, func, or_
 from app.clashofclans import bp
 from app.extensions import db, limiter, get_real_ip
 from config import Config
 from app.models.clashofclans import CocPlayerDataSchema, CocPlayerData, CocPlayer, CocPlayerSchema, CocPlayerWarHistory, CocPlayerWarHistorySchema
 from dateutil import parser
-
-BASE_URL = "https://cocproxy.royaleapi.dev/v1"
-headers = {
-    "Authorization": f"Bearer {Config.COC_BEARER_TOKEN}",
-}
+from app.clashofclans.coc_api import BASE_URL, coc_get, encode_tag, error_message, normalise_tag
+from app.clashofclans.war import cwl_war_tags, parse_coc_time, pick_wars, summarise_clan, summarise_cwl
 
 
 @bp.route('set_player_data', methods=['POST'])
@@ -34,7 +29,7 @@ def set_player_data():
 
 
     # Fetch clan data
-    clan_response = requests.get(f"{BASE_URL}/clans/%23220QP2GGU", headers=headers)
+    clan_response = coc_get("/clans/%23220QP2GGU")
 
     if clan_response.status_code != 200:
         return jsonify({"success": False, "error": clan_response.json().get("message")}), clan_response.status_code
@@ -72,7 +67,7 @@ def set_player_data():
             try:
 
                 url = f"{BASE_URL}/players/{tag.replace('#', '%23')}"
-                player_response = requests.get(url, headers=headers)
+                player_response = coc_get(url)
 
                 if player_response.status_code != 200:
                     return None
@@ -131,7 +126,7 @@ def update_player_activity():
             try:
 
                 url = f"{BASE_URL}/players/{tag.replace('#', '%23')}"
-                player_response = requests.get(url, headers=headers)
+                player_response = coc_get(url)
 
                 if player_response.status_code != 200:
                     return None
@@ -287,7 +282,7 @@ def get_player_profile(tag):
     Retrieves a player's ingame data
     """
     tag = tag.replace("#", "%23")
-    player_response = requests.get(f"{BASE_URL}/players/{tag}", headers=headers)
+    player_response = coc_get(f"{BASE_URL}/players/{tag}")
 
     if player_response.status_code != 200:
         return jsonify({"success": False, "error": player_response.json().get("message")}), player_response.status_code
@@ -298,7 +293,7 @@ def get_player_profile(tag):
 @bp.route('/goldpass', methods=['GET'])
 @limiter.limit('40/minute', override_defaults=True)
 def gold_pass():
-    gold_response = requests.get(f"{BASE_URL}/goldpass/seasons/current", headers=headers)
+    gold_response = coc_get(f"{BASE_URL}/goldpass/seasons/current")
 
     if gold_response.status_code != 200:
         return jsonify({"success": False, "error": gold_response.json().get("message")}), gold_response.status_code
@@ -312,7 +307,7 @@ def get_current_regular_war(tag):
     Retrieves information about a clan's current war
     """
     tag = tag.replace("#", "%23")
-    war_response = requests.get(f"{BASE_URL}/clans/{tag}/currentwar", headers=headers)
+    war_response = coc_get(f"{BASE_URL}/clans/{tag}/currentwar")
 
     if war_response.status_code != 200:
         return jsonify({"success": False, "error": war_response.json().get("message")}), war_response.status_code
@@ -326,86 +321,77 @@ def get_current_CWL_war(war_tag):
     Retrieves information about a CWL war
     """
     war_tag = war_tag.replace("#", "%23")
-    war_response = requests.get(f"{BASE_URL}/clanwarleagues/wars/{war_tag}", headers=headers)
+    war_response = coc_get(f"{BASE_URL}/clanwarleagues/wars/{war_tag}")
 
     if war_response.status_code != 200:
         return jsonify({"success": False, "error": war_response.json().get("message")}), war_response.status_code
 
     return jsonify(war_response.json()), 200
 
+def _fetch_cwl_wars(leaguegroup_data):
+    """Fetch every CWL war in the league group concurrently. Each war gets a `war_tag` ('#...')."""
+    tags = [war_tag for _, war_tag in cwl_war_tags(leaguegroup_data)]
+    if not tags:
+        return []
+
+    def fetch(war_tag):
+        response = coc_get(f"/clanwarleagues/wars/{encode_tag(war_tag)}")
+        if not response.ok:
+            return None
+        data = response.json()
+        data["war_tag"] = war_tag
+        return data
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        wars = [w for w in executor.map(fetch, tags) if w]
+    wars.sort(key=lambda w: parse_coc_time(w.get("startTime")) or datetime.min.replace(tzinfo=ZoneInfo("UTC")))
+    return wars
+
+
+def fetch_war_sources(tag):
+    """
+    Fetch the clan's regular war, CWL league group and all CWL wars.
+    Return value: (regular_war or None, regular_war_private, leaguegroup or None, cwl_wars, error, status)
+    """
+    encoded = encode_tag(tag)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        war_future = executor.submit(coc_get, f"/clans/{encoded}/currentwar")
+        leaguegroup_future = executor.submit(coc_get, f"/clans/{encoded}/currentwar/leaguegroup")
+        war_response, leaguegroup_response = war_future.result(), leaguegroup_future.result()
+
+    # League group is 404 outside of CWL; current war is 403 when the war log is private
+    if not leaguegroup_response.ok and leaguegroup_response.status_code != 404:
+        return None, False, None, [], error_message(leaguegroup_response), leaguegroup_response.status_code
+    if not war_response.ok and war_response.status_code != 403:
+        return None, False, None, [], error_message(war_response), war_response.status_code
+
+    regular_war = war_response.json() if war_response.ok else None
+    leaguegroup = leaguegroup_response.json() if leaguegroup_response.ok else None
+    cwl_wars = _fetch_cwl_wars(leaguegroup) if leaguegroup else []
+    return regular_war, war_response.status_code == 403, leaguegroup, cwl_wars, None, 200
+
+
 def current_active_war(tag):
     """
     Retrieves the current active war of the clan, whether it is a regular or CWL war.
-    This will take longer to run because it goes through all CWL wars if they exist
+    The returned war is oriented so `clan` is the requested clan, and has `isCwl` set.
     Return value: war_data, error_message, status_code
     """
-    tag = tag.replace("#", "%23")
-    war_url = f"{BASE_URL}/clans/{tag}/currentwar"
-    leaguegroup_url = f"{BASE_URL}/clans/{tag}/currentwar/leaguegroup"
+    clan_tag = normalise_tag(tag)
+    regular_war, private, _, cwl_wars, error, status = fetch_war_sources(clan_tag)
+    if error:
+        return None, error, status
 
-    def fetch(url):
-        return requests.get(url, headers=headers)
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(fetch, url) for url in [war_url, leaguegroup_url]]
-        war_response, leaguegroup_response = [f.result() for f in futures]
-
-    leaguegroup_response = requests.get(leaguegroup_url, headers=headers)
-    if not leaguegroup_response.ok and leaguegroup_response.status_code != 404:
-        return None, leaguegroup_response.json().get("message"), leaguegroup_response.status_code
-    if not war_response.ok and war_response.status_code != 403:
-        return None, war_response.json().get("message"), war_response.status_code
-    
-    def fetchCWLWar(url, war_tag):
-        response = requests.get(url, headers=headers)
-        if response.ok:
-            data = response.json()
-            data["war_tag"] = war_tag
-            return data
-        else:
-            return None
-    
-    if leaguegroup_response.ok:
-        leaguegroup_data = leaguegroup_response.json()
-        cwl_war_tags = []
-        for r in leaguegroup_data.get("rounds"):
-            for war_tag in r.get("warTags"):
-                if war_tag != "#0":
-                    cwl_war_tags.append(war_tag.replace("#", "%23"))
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(fetchCWLWar, f"{BASE_URL}/clanwarleagues/wars/{war_tag}", war_tag) for war_tag in cwl_war_tags]
-            cwl_wars = [f.result() for f in futures 
-                                 if f.result()]
-            tag = tag.replace("%23", "#")
-            
-            # Loop through and find the current active war (if no active then get preparation or ended war)
-            active_war = None
-            for war in cwl_wars:
-                war_tag = war.get("war_tag").replace("%23","#")
-
-                # If we are the opponent, swap oponent and clan
-                if war.get("opponent").get("tag") == tag:
-                    war["clan"], war["opponent"] = war["opponent"], war["clan"]
-                
-                if war["clan"].get("tag") == tag and war.get("state") == "inWar":
-                    active_war = war
-                # Preparation war is last priority if there's no ongoing wars (1st CWL war hasn't started yet)
-                if war["clan"].get("tag") == tag and war.get("state") in ["preparation", "warEnded"] and not active_war:
-                    active_war = war
-            active_war["isCwl"] = True
-            return active_war, None, 200
-    
-    # Return the regular war
-    if war_response.ok:
-        war_data = war_response.json()
-        war_data["isCwl"] = False
-        if war_data.get("state") == "notInWar":
-            return None, "No war found", 404
-        else:
-            return war_data, None, 200
-    else:
+    active_war, _ = pick_wars(clan_tag, regular_war, cwl_wars)
+    if active_war:
+        if active_war.get("war_tag"):
+            # Keep the historical URL-encoded format ('%23...') that API consumers already rely on
+            active_war["war_tag"] = encode_tag(active_war["war_tag"])
+        return active_war, None, 200
+    if private:
         return None, "Private war log", 404
-            
+    return None, "No war found", 404
+
 @bp.route('/clan/<string:tag>/activewar', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
 def get_curent_active_war(tag):
@@ -501,30 +487,59 @@ def get_war_attack_history(clan_tag):
 @bp.route('/clan/<string:tag>/update_war_history', methods=['POST'])
 @limiter.limit('5/minute', override_defaults=True)
 def update_war_history(tag):
-    post_body = request.json
+    post_body = request.get_json(silent=True) or {}
     if 'password' not in post_body:
             return jsonify({"success": False, 'error': 'password not provided'}), 400
     if post_body['password'] != Config.PARKING_POST_PASSWORD:
             return jsonify({"success": False, 'error': 'incorrect password'}), 400
-    
-    data, error, status = current_active_war(tag)
 
-    if error or not data:
+    clan_tag = normalise_tag(tag)
+    regular_war, private, _, cwl_wars, error, status = fetch_war_sources(clan_tag)
+    if error:
         return jsonify({"success": False, "error": error}), status
-    
-    if data["state"] not in ["inWar", "warEnded"]:
+
+    # Record every war we are part of that has attacks: the active war, plus every CWL round
+    # (a CWL round ends at the same moment the next starts, so only looking at the active
+    # war would drop attacks made in the last minutes of each round).
+    wars = []
+    active_war, _ = pick_wars(clan_tag, regular_war, [])
+    if active_war:
+        wars.append(active_war)
+    for cwl_war in cwl_wars:
+        oriented, _ = pick_wars(clan_tag, None, [cwl_war])  # orients + tags isCwl, None if not ours
+        if oriented:
+            wars.append(oriented)
+
+    wars = [w for w in wars if w.get("state") in ("inWar", "warEnded")]
+    if not wars:
+        if not active_war and not cwl_wars:
+            return jsonify({"success": False, "error": "Private war log" if private else "No war found"}), 404
         # No attacks to process
         return jsonify({"success": True})
-    
-    war_preparation_start = datetime.strptime(data["preparationStartTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
-    war_start = datetime.strptime(data["startTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
-    war_end = datetime.strptime(data["endTime"].replace('Z', ''), "%Y%m%dT%H%M%S.%f").replace(tzinfo=ZoneInfo("UTC"))
 
-    for member in data["clan"]["members"]:
+    # Oldest first so per-player war counters move forward in order
+    wars.sort(key=lambda w: parse_coc_time(w.get("preparationStartTime")) or datetime.min.replace(tzinfo=ZoneInfo("UTC")))
+    for war in wars:
+        _record_war_attacks(war)
+
+    return jsonify({"success": True})
+
+
+def _record_war_attacks(data):
+    war_preparation_start = parse_coc_time(data.get("preparationStartTime"))
+    war_start = parse_coc_time(data.get("startTime"))
+    war_end = parse_coc_time(data.get("endTime"))
+    if not (war_preparation_start and war_start and war_end):
+        print(f"Skipping war with missing timestamps: {data.get('war_tag')}", file=sys.stderr)
+        return
+
+    is_cwl = data["isCwl"]
+    defenders = {p["tag"]: p for p in (data.get("opponent") or {}).get("members") or []}
+
+    for member in (data.get("clan") or {}).get("members") or []:
         player_tag = member["tag"]
-        town_hall = member["townhallLevel"]
-        map_position = member["mapPosition"]
-        is_cwl=data["isCwl"]
+        town_hall = member.get("townhallLevel")
+        map_position = member.get("mapPosition")
 
         # increment the war count of this player if not already done
         player = db.session.query(CocPlayer).filter_by(tag=player_tag).first()
@@ -540,7 +555,7 @@ def update_war_history(tag):
                     player.regular_wars = (player.regular_wars or 0) + 1
                     db.session.commit()
 
-        for attack in member.get("attacks", []):
+        for attack in member.get("attacks") or []:
             attack_order = attack["order"]
             defender_tag = attack["defenderTag"]
 
@@ -551,27 +566,24 @@ def update_war_history(tag):
 
             if existing_entry:
                 continue
-            
-            stars = attack["stars"]
-            destruction_percentage = attack["destructionPercentage"]
-            duration = attack["duration"]
 
             # Need to find additional defender information
-            defender = next((p for p in data["opponent"]["members"] if p["tag"] == defender_tag), None)
-            defender_townhall = defender["townhallLevel"]
-            defender_map_position = defender["mapPosition"]
+            defender = defenders.get(defender_tag)
+            if not defender:
+                print(f"Defender {defender_tag} not found in war {data.get('war_tag')}", file=sys.stderr)
+                continue
 
             new_entry = CocPlayerWarHistory(
                 war_end_timestamp=war_end,
                 tag=player_tag,
                 attacker_townhall=town_hall,
                 map_position=map_position,
-                defender_townhall=defender_townhall,
+                defender_townhall=defender.get("townhallLevel"),
                 defender_tag=defender_tag,
-                defender_map_position=defender_map_position,
-                destruction_percentage=destruction_percentage,
-                duration=duration,
-                stars=stars,
+                defender_map_position=defender.get("mapPosition"),
+                destruction_percentage=attack["destructionPercentage"],
+                duration=attack["duration"],
+                stars=attack["stars"],
                 attack_order=attack_order,
                 is_cwl=is_cwl,
                 preparation_start_timestamp=war_preparation_start,
@@ -583,9 +595,7 @@ def update_war_history(tag):
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
-            
-    
-    return jsonify({"success": True})
+                print(f"Failed to save attack {attack_order} of {player_tag}: {e}", file=sys.stderr)
 
 @bp.route('/clan/<string:tag>/warlog', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
@@ -594,7 +604,13 @@ def get_war_log(tag):
     Retrieves a clan's war log
     """
     tag = tag.replace("#", "%23")
-    war_log_response = requests.get(f"{BASE_URL}/clans/{tag}/warlog", headers=headers)
+    params = {}
+    if request.args.get('limit'):
+        try:
+            params["limit"] = max(1, min(int(request.args['limit']), 100))
+        except ValueError:
+            return jsonify({"success": False, "error": "limit must be an integer"}), 400
+    war_log_response = coc_get(f"{BASE_URL}/clans/{tag}/warlog", params=params or None)
 
     if war_log_response.status_code == 403:
         return jsonify({"success": False, "error": "Private war log"}), war_log_response.status_code
@@ -602,6 +618,74 @@ def get_war_log(tag):
         return jsonify({"success": False, "error": war_log_response.json().get("message")}), war_log_response.status_code
 
     return jsonify(war_log_response.json()), 200
+
+@bp.route('/clan/<string:tag>/warboard', methods=['GET'])
+@limiter.limit('30/minute', override_defaults=True)
+def get_war_board(tag):
+    """
+    Everything needed to render a live war board in one call:
+      clan              - summary of the requested clan (record, streak, league, badge)
+      war               - the most relevant war (battle day > preparation > ended; regular or CWL),
+                          oriented so `clan` is the requested clan, with isCwl / cwl_round / attacksPerMember
+      opponent_clan     - summary of the opponent clan (record, streak) or null
+      recent_ended_war  - latest ended war that isn't `war` (e.g. the CWL round that just finished) or null
+      cwl               - CWL group standings + our rounds, or null outside CWL
+      last_war          - most recent war log entry (only when there is no war to show), or null
+      war_log_private   - true if the clan's war log is private
+    """
+    clan_tag = normalise_tag(tag)
+    encoded = encode_tag(clan_tag)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        clan_future = executor.submit(coc_get, f"/clans/{encoded}")
+        sources_future = executor.submit(fetch_war_sources, clan_tag)
+        clan_response = clan_future.result()
+        regular_war, private, leaguegroup, cwl_wars, error, status = sources_future.result()
+
+    if not clan_response.ok:
+        return jsonify({"success": False, "error": error_message(clan_response)}), clan_response.status_code
+    if error:
+        return jsonify({"success": False, "error": error}), status
+
+    clan = clan_response.json()
+    war, recent_ended_war = pick_wars(clan_tag, regular_war, cwl_wars)
+
+    cwl = summarise_cwl(leaguegroup, cwl_wars, clan_tag, war.get("war_tag") if war else None) if leaguegroup else None
+    if cwl:
+        cwl["league"] = (clan.get("warLeague") or {}).get("name")
+        if not cwl["rounds"] and cwl["state"] not in ("preparation", "inWar"):
+            cwl = None  # Stale group from an old season with none of our wars
+
+    for w in (war, recent_ended_war):
+        if not w:
+            continue
+        w.setdefault("attacksPerMember", 1 if w["isCwl"] else 2)
+        if w["isCwl"] and cwl:
+            w["cwl_round"] = next((r["round"] for r in cwl["rounds"] if r["war_tag"] == w.get("war_tag")), None)
+
+    opponent_clan = None
+    if war and (war.get("opponent") or {}).get("tag"):
+        opponent_response = coc_get(f"/clans/{encode_tag(war['opponent']['tag'])}")
+        if opponent_response.ok:
+            opponent_clan = summarise_clan(opponent_response.json())
+
+    last_war = None
+    if not war and clan.get("isWarLogPublic"):
+        war_log_response = coc_get(f"/clans/{encoded}/warlog", params={"limit": 1})
+        if war_log_response.ok:
+            items = war_log_response.json().get("items") or []
+            last_war = items[0] if items else None
+
+    return jsonify({
+        "clan": summarise_clan(clan),
+        "war": war,
+        "opponent_clan": opponent_clan,
+        "recent_ended_war": recent_ended_war,
+        "cwl": cwl,
+        "last_war": last_war,
+        "war_log_private": private,
+    }), 200
+
 
 @bp.route('/fullclan/<string:tag>', methods=['GET'])
 @limiter.limit('15/minute', override_defaults=True)
@@ -617,7 +701,7 @@ def get_full_clan_data(tag):
     leaguegroup_url = f"{BASE_URL}/clans/{tag}/currentwar/leaguegroup"
 
     def fetch(url):
-        return requests.get(url, headers=headers)
+        return coc_get(url)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [executor.submit(fetch, url) for url in [clan_url, capital_raid, war_url, leaguegroup_url]]
@@ -625,13 +709,13 @@ def get_full_clan_data(tag):
     
 
     if not clan_response.ok:
-        return jsonify({"success": False, "error": clan_response.json().get("message")}), clan_response.status_code
+        return jsonify({"success": False, "error": error_message(clan_response)}), clan_response.status_code
     if not capital_raid_response.ok:
-        return jsonify({"success": False, "error": capital_raid_response.json().get("message")}), capital_raid_response.status_code
+        return jsonify({"success": False, "error": error_message(capital_raid_response)}), capital_raid_response.status_code
     if not war_response.ok and war_response.status_code != 403:
-        return jsonify({"success": False, "error": war_response.json().get("message")}), capital_raid_response.status_code
+        return jsonify({"success": False, "error": error_message(war_response)}), war_response.status_code
     if not leaguegroup_response.ok and leaguegroup_response.status_code != 404:
-        return jsonify({"success": False, "error": leaguegroup_response.json().get("message")}), leaguegroup_response.status_code
+        return jsonify({"success": False, "error": error_message(leaguegroup_response)}), leaguegroup_response.status_code
     # League group can be 404 if CWL is not currently active
     # Current war is 403 if war log is not private
 
@@ -640,34 +724,17 @@ def get_full_clan_data(tag):
     else:
         leaguegroup_data = leaguegroup_response.json()
     
-    # If leaguegroup exists then fetch all CWL wars
-    def fetchCWLWar(url, war_tag):
-        response = requests.get(url, headers=headers)
-        if response.ok:
-            data = response.json()
-            data["war_tag"] = war_tag
-            return data
-        else:
-            return None
+    # If leaguegroup exists then fetch all CWL wars (sorted by start time)
     cwl_wars = None
     if leaguegroup_data:
-        cwl_war_tags = []
-        for r in leaguegroup_data.get("rounds"):
-            for war_tag in r.get("warTags"):
-                if war_tag != "#0":
-                    cwl_war_tags.append(war_tag.replace("#", "%23"))
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(fetchCWLWar, f"{BASE_URL}/clanwarleagues/wars/{war_tag}", war_tag) for war_tag in cwl_war_tags]
-            cwl_wars = [f.result() for f in futures 
-                                 if f.result()]
-            # Keeping it sorted in order is good
-            cwl_wars.sort(key=lambda x: datetime.strptime(x["startTime"], "%Y%m%dT%H%M%S.%fZ"))
-        
-
+        cwl_wars = _fetch_cwl_wars(leaguegroup_data)
+        for war in cwl_wars:
+            # Keep the historical URL-encoded format ('%23...') that API consumers already rely on
+            war["war_tag"] = encode_tag(war["war_tag"])
 
     clan = clan_response.json()
 
-    capital_data = capital_raid_response.json()["items"]
+    capital_data = capital_raid_response.json().get("items") or []
     if len(capital_data) == 1:
         capital_data = capital_data[0]
     else:
@@ -683,7 +750,7 @@ def get_full_clan_data(tag):
     for member in clan["memberList"]:
         # Getting raid contributions for current clan capital raid
         if capital_data and capital_data.get("state") == "ongoing":
-            capital_player = next((p for p in capital_data["members"] if p["tag"] == member["tag"]), None)
+            capital_player = next((p for p in capital_data.get("members") or [] if p["tag"] == member["tag"]), None)
             if capital_player:
                 member["clan_capital"] = {
                     "attacks": capital_player.get("attacks", 0),
@@ -696,7 +763,7 @@ def get_full_clan_data(tag):
         
         # Getting current normal war attacks for ongoing war
         if war_data and war_data.get("state") == "inWar":
-            war_player = next((p for p in war_data["clan"]["members"] if p["tag"] == member["tag"]), None)
+            war_player = next((p for p in war_data["clan"].get("members") or [] if p["tag"] == member["tag"]), None)
 
             if war_player:
                 member["war"] = {
@@ -734,7 +801,7 @@ def get_full_clan_data(tag):
                 else:
                     continue
 
-                war_player = next((p for p in warMembers if p["tag"] == member["tag"]), None)
+                war_player = next((p for p in warMembers or [] if p["tag"] == member["tag"]), None)
 
                 # War state can be inWar or warEnded
                 if war_player:
@@ -748,7 +815,7 @@ def get_full_clan_data(tag):
                     elif war.get("state") == "inWar":
                         attack_todo = True
                     
-                    if war_player.get("opponentAttacks") > 0:
+                    if (war_player.get("opponentAttacks") or 0) > 0:
                         defends += war_player.get("opponentAttacks")
                         if war_player.get("bestOpponentAttack"):
                             best_attack = war_player.get("bestOpponentAttack")
@@ -844,7 +911,7 @@ def get_capital_raid_seasons(tag):
     if after:
         params["after"] = after
 
-    capital_raid_response = requests.get(f"{BASE_URL}/clans/{tag}/capitalraidseasons", params=params, headers=headers)
+    capital_raid_response = coc_get(f"{BASE_URL}/clans/{tag}/capitalraidseasons", params=params)
 
     if capital_raid_response.status_code != 200:
         return jsonify({"success": False, "error": capital_raid_response.json().get("reason")}), capital_raid_response.status_code
