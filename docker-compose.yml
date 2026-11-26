@@ -85,7 +85,7 @@ services:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - COC_BEARER_TOKEN=${COC_BEARER_TOKEN}
       - TORN_API_KEY=${TORN_API_KEY}
-      - CLASH_WAR_BOARD_CHANNEL_ID=${CLASH_WAR_BOARD_CHANNEL_ID:-0}
+      - CLASH_WAR_BOARD_CHANNEL_ID=${CLASH_WAR_BOARD_CHANNEL_ID:-}
     depends_on:
       - flask_app
     networks:
